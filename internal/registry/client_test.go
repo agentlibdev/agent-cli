@@ -1,0 +1,91 @@
+package registry
+
+import (
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/agentlibdev/agent-cli/internal/agentref"
+)
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (fn roundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) {
+	return fn(request)
+}
+
+func TestClientFetchesVersionAndArtifacts(t *testing.T) {
+	httpClient := &http.Client{
+		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			switch request.URL.Path {
+			case "/api/v1/agents/raul/code-reviewer/versions/0.4.0":
+				return jsonResponse(`{"version":{"namespace":"raul","name":"code-reviewer","version":"0.4.0","title":"Code Reviewer","description":"Reviews code changes.","license":"MIT","manifestJson":"{}","publishedAt":"2026-03-23T00:00:00Z"}}`), nil
+			case "/api/v1/agents/raul/code-reviewer/versions/0.4.0/artifacts":
+				return jsonResponse(`{"items":[{"path":"agent.yaml","mediaType":"application/yaml","sizeBytes":12},{"path":"README.md","mediaType":"text/markdown","sizeBytes":24}]}`), nil
+			default:
+				return notFoundResponse(), nil
+			}
+		}),
+	}
+
+	client := NewWithHTTPClient("https://agentlib.dev", httpClient)
+	ref, err := agentref.Parse("raul/code-reviewer@0.4.0")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	version, err := client.FetchVersion(t.Context(), ref)
+	if err != nil {
+		t.Fatalf("FetchVersion returned error: %v", err)
+	}
+	if version.Title != "Code Reviewer" {
+		t.Fatalf("Title = %q, want %q", version.Title, "Code Reviewer")
+	}
+
+	artifacts, err := client.FetchArtifacts(t.Context(), ref)
+	if err != nil {
+		t.Fatalf("FetchArtifacts returned error: %v", err)
+	}
+	if len(artifacts) != 2 {
+		t.Fatalf("len(artifacts) = %d, want 2", len(artifacts))
+	}
+}
+
+func TestClientReturnsErrorForUpstreamFailures(t *testing.T) {
+	httpClient := &http.Client{
+		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			return notFoundResponse(), nil
+		}),
+	}
+
+	client := NewWithHTTPClient("https://agentlib.dev", httpClient)
+	ref, err := agentref.Parse("raul/code-reviewer@0.4.0")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if _, err := client.FetchVersion(t.Context(), ref); err == nil {
+		t.Fatal("FetchVersion returned nil error")
+	}
+}
+
+func jsonResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header: http.Header{
+			"content-type": []string{"application/json"},
+		},
+		Body: io.NopCloser(strings.NewReader(body)),
+	}
+}
+
+func notFoundResponse() *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusNotFound,
+		Header: http.Header{
+			"content-type": []string{"application/json"},
+		},
+		Body: io.NopCloser(strings.NewReader(`{"error":{"code":"not_found","message":"missing"}}`)),
+	}
+}
