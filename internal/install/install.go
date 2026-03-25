@@ -76,3 +76,34 @@ func Run(ctx context.Context, registryClient Registry, workingDir string, ref ag
 
 	return Result{Root: installRoot}, nil
 }
+
+func Remove(workingDir string, ref agentref.Ref) error {
+	installRoot := filepath.Join(workingDir, ".agentlib", "agents", ref.Namespace, ref.Name, ref.Version)
+	if err := os.RemoveAll(installRoot); err != nil {
+		return err
+	}
+
+	lockfilePath := filepath.Join(workingDir, ".agentlib", "agent.lock.json")
+	lockfileBytes, err := os.ReadFile(lockfilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	var lockfile Lockfile
+	if err := json.Unmarshal(lockfileBytes, &lockfile); err != nil {
+		return err
+	}
+
+	if lockfile.Agent.Namespace == ref.Namespace &&
+		lockfile.Agent.Name == ref.Name &&
+		lockfile.Agent.Version == ref.Version {
+		if err := os.Remove(lockfilePath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	return nil
+}

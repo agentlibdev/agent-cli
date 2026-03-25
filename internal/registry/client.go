@@ -27,6 +27,14 @@ type Version struct {
 	PublishedAt  string
 }
 
+type AgentSummary struct {
+	Namespace     string
+	Name          string
+	LatestVersion string
+	Title         string
+	Description   string
+}
+
 type Artifact struct {
 	Path      string
 	MediaType string
@@ -69,6 +77,19 @@ func (c Client) FetchArtifacts(ctx context.Context, ref agentref.Ref) ([]Artifac
 	}
 
 	path := fmt.Sprintf("%s/api/v1/agents/%s/%s/versions/%s/artifacts", c.baseURL, ref.Namespace, ref.Name, ref.Version)
+	if err := c.getJSON(ctx, path, &body); err != nil {
+		return nil, err
+	}
+
+	return body.Items, nil
+}
+
+func (c Client) FetchAgents(ctx context.Context) ([]AgentSummary, error) {
+	var body struct {
+		Items []AgentSummary `json:"items"`
+	}
+
+	path := fmt.Sprintf("%s/api/v1/agents", c.baseURL)
 	if err := c.getJSON(ctx, path, &body); err != nil {
 		return nil, err
 	}

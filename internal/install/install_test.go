@@ -2,6 +2,7 @@ package install
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -65,5 +66,50 @@ func TestInstallerWritesArtifactsAndLockfile(t *testing.T) {
 
 	if result.Root != filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0") {
 		t.Fatalf("Root = %q", result.Root)
+	}
+}
+
+func TestRemoveDeletesVersionAndMatchingLockfile(t *testing.T) {
+	root := t.TempDir()
+
+	versionDir := filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	otherVersionDir := filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.3.0")
+	if err := os.MkdirAll(otherVersionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+
+	lockfilePath := filepath.Join(root, ".agentlib", "agent.lock.json")
+	lockfile := Lockfile{Version: 1}
+	lockfile.Agent.Namespace = "raul"
+	lockfile.Agent.Name = "code-reviewer"
+	lockfile.Agent.Version = "0.4.0"
+	lockfileBytes, err := json.Marshal(lockfile)
+	if err != nil {
+		t.Fatalf("Marshal returned error: %v", err)
+	}
+	if err := os.WriteFile(lockfilePath, lockfileBytes, 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	ref, err := agentref.Parse("raul/code-reviewer@0.4.0")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	if err := Remove(root, ref); err != nil {
+		t.Fatalf("Remove returned error: %v", err)
+	}
+
+	if _, err := os.Stat(versionDir); !os.IsNotExist(err) {
+		t.Fatalf("removed version dir still exists: %v", err)
+	}
+	if _, err := os.Stat(otherVersionDir); err != nil {
+		t.Fatalf("other version dir missing: %v", err)
+	}
+	if _, err := os.Stat(lockfilePath); !os.IsNotExist(err) {
+		t.Fatalf("matching lockfile still exists: %v", err)
 	}
 }

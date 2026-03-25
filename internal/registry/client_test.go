@@ -52,6 +52,32 @@ func TestClientFetchesVersionAndArtifacts(t *testing.T) {
 	}
 }
 
+func TestClientFetchesAgents(t *testing.T) {
+	httpClient := &http.Client{
+		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
+			switch request.URL.Path {
+			case "/api/v1/agents":
+				return jsonResponse(`{"items":[{"namespace":"raul","name":"code-reviewer","latestVersion":"0.4.0","title":"Code Reviewer","description":"Reviews code changes."},{"namespace":"raul","name":"docs-writer","latestVersion":"0.2.0","title":"Docs Writer","description":"Drafts documentation."}],"nextCursor":null}`), nil
+			default:
+				return notFoundResponse(), nil
+			}
+		}),
+	}
+
+	client := NewWithHTTPClient("https://agentlib.dev", httpClient)
+
+	agents, err := client.FetchAgents(t.Context())
+	if err != nil {
+		t.Fatalf("FetchAgents returned error: %v", err)
+	}
+	if len(agents) != 2 {
+		t.Fatalf("len(agents) = %d, want 2", len(agents))
+	}
+	if agents[0].Name != "code-reviewer" {
+		t.Fatalf("agents[0].Name = %q, want %q", agents[0].Name, "code-reviewer")
+	}
+}
+
 func TestClientReturnsErrorForUpstreamFailures(t *testing.T) {
 	httpClient := &http.Client{
 		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {

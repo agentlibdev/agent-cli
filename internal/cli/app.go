@@ -6,12 +6,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/agentlibdev/agent-cli/internal/agentref"
 	"github.com/agentlibdev/agent-cli/internal/install"
 	"github.com/agentlibdev/agent-cli/internal/manifest"
 	"github.com/agentlibdev/agent-cli/internal/registry"
 )
+
+type registryClient interface {
+	FetchVersion(ctx context.Context, ref agentref.Ref) (registry.Version, error)
+	FetchArtifacts(ctx context.Context, ref agentref.Ref) ([]registry.Artifact, error)
+	DownloadArtifact(ctx context.Context, ref agentref.Ref, path string) ([]byte, string, error)
+	FetchAgents(ctx context.Context) ([]registry.AgentSummary, error)
+}
+
+var newRegistryClient = func(baseURL string) registryClient {
+	return registry.New(baseURL)
+}
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -22,10 +34,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "validate":
 		return runValidate(args[1:], stdout, stderr)
+	case "search":
+		return runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
 		return runShow(ctx, args[1:], stdout, stderr)
 	case "install":
 		return runInstall(ctx, args[1:], stdout, stderr)
+	case "remove":
+		return runRemove(args[1:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command %q\n\n", args[0])
 		printUsage(stderr)
@@ -55,6 +71,39 @@ func runValidate(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib search <query>")
+		return 1
+	}
+
+	client := newRegistryClient(registryBaseURL())
+	agents, err := client.FetchAgents(ctx)
+	if err != nil {
+		fmt.Fprintf(stderr, "search agents: %v\n", err)
+		return 1
+	}
+
+	query := strings.ToLower(args[0])
+	results := 0
+	for _, agent := range agents {
+		if !matchesSearch(agent, query) {
+			continue
+		}
+
+		fmt.Fprintf(stdout, "%s/%s@%s\n", agent.Namespace, agent.Name, agent.LatestVersion)
+		fmt.Fprintf(stdout, "title: %s\n", agent.Title)
+		fmt.Fprintf(stdout, "description: %s\n", agent.Description)
+		results++
+	}
+
+	if results == 0 {
+		fmt.Fprintln(stdout, "no agents found")
+	}
+
+	return 0
+}
+
 func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: agentlib show <namespace/name@version>")
@@ -67,7 +116,7 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	client := registry.New(registryBaseURL())
+	client := newRegistryClient(registryBaseURL())
 	version, err := client.FetchVersion(ctx, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "fetch version: %v\n", err)
@@ -110,7 +159,7 @@ func runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		return 1
 	}
 
-	result, err := install.Run(ctx, registry.New(registryBaseURL()), workingDir, ref)
+	result, err := install.Run(ctx, newRegistryClient(registryBaseURL()), workingDir, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "install agent: %v\n", err)
 		return 1
@@ -120,6 +169,33 @@ func runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	fmt.Fprintf(stdout, "installed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
 	fmt.Fprintf(stdout, "root: %s\n", result.Root)
 	fmt.Fprintf(stdout, "lockfile: %s\n", lockfile)
+	return 0
+}
+
+func runRemove(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib remove <namespace/name@version>")
+		return 1
+	}
+
+	ref, err := agentref.Parse(args[0])
+	if err != nil {
+		fmt.Fprintf(stderr, "parse ref: %v\n", err)
+		return 1
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
+		return 1
+	}
+
+	if err := install.Remove(workingDir, ref); err != nil {
+		fmt.Fprintf(stderr, "remove agent: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "removed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
 	return 0
 }
 
@@ -136,6 +212,19 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "Commands:")
 	fmt.Fprintln(writer, "  validate <path>")
+	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
 	fmt.Fprintln(writer, "  install <namespace/name@version>")
+	fmt.Fprintln(writer, "  remove <namespace/name@version>")
+}
+
+func matchesSearch(agent registry.AgentSummary, query string) bool {
+	candidate := strings.ToLower(strings.Join([]string{
+		agent.Namespace,
+		agent.Name,
+		agent.Title,
+		agent.Description,
+	}, " "))
+
+	return strings.Contains(candidate, query)
 }

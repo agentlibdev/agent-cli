@@ -7,8 +7,10 @@ Go command-line client for AgentLib.
 Current commands:
 
 - `agentlib validate ./agent.yaml`
+- `agentlib search reviewer`
 - `agentlib show raul/code-reviewer@0.4.0`
 - `agentlib install raul/code-reviewer@0.4.0`
+- `agentlib remove raul/code-reviewer@0.4.0`
 
 ## Registry selection
 
@@ -37,6 +39,8 @@ and writes a lockfile to:
 ```text
 .agentlib/agent.lock.json
 ```
+
+`remove` deletes one exact installed version from that layout and removes the lockfile if it points at the same exact version.
 
 ## Development
 
