@@ -12,6 +12,7 @@ import (
 	"github.com/agentlibdev/agent-cli/internal/install"
 	"github.com/agentlibdev/agent-cli/internal/manifest"
 	"github.com/agentlibdev/agent-cli/internal/registry"
+	"github.com/agentlibdev/agent-cli/internal/version"
 )
 
 type registryClient interface {
@@ -21,25 +22,35 @@ type registryClient interface {
 	FetchAgents(ctx context.Context) ([]registry.AgentSummary, error)
 }
 
-var newRegistryClient = func(baseURL string) registryClient {
-	return registry.New(baseURL)
+type app struct {
+	newRegistryClient func(baseURL string) registryClient
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	return app{
+		newRegistryClient: func(baseURL string) registryClient {
+			return registry.New(baseURL)
+		},
+	}.Run(ctx, args, stdout, stderr)
+}
+
+func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		printUsage(stderr)
 		return 1
 	}
 
 	switch args[0] {
+	case "version":
+		return a.runVersion(args[1:], stdout, stderr)
 	case "validate":
 		return runValidate(args[1:], stdout, stderr)
 	case "search":
-		return runSearch(ctx, args[1:], stdout, stderr)
+		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
-		return runShow(ctx, args[1:], stdout, stderr)
+		return a.runShow(ctx, args[1:], stdout, stderr)
 	case "install":
-		return runInstall(ctx, args[1:], stdout, stderr)
+		return a.runInstall(ctx, args[1:], stdout, stderr)
 	case "remove":
 		return runRemove(args[1:], stdout, stderr)
 	default:
@@ -47,6 +58,16 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		printUsage(stderr)
 		return 1
 	}
+}
+
+func (a app) runVersion(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "usage: agentlib version")
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "agentlib %s\n", version.Version)
+	return 0
 }
 
 func runValidate(args []string, stdout, stderr io.Writer) int {
@@ -71,13 +92,13 @@ func runValidate(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func (a app) runSearch(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: agentlib search <query>")
 		return 1
 	}
 
-	client := newRegistryClient(registryBaseURL())
+	client := a.registryClient()
 	agents, err := client.FetchAgents(ctx)
 	if err != nil {
 		fmt.Fprintf(stderr, "search agents: %v\n", err)
@@ -104,7 +125,7 @@ func runSearch(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	return 0
 }
 
-func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func (a app) runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: agentlib show <namespace/name@version>")
 		return 1
@@ -116,7 +137,7 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	client := newRegistryClient(registryBaseURL())
+	client := a.registryClient()
 	version, err := client.FetchVersion(ctx, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "fetch version: %v\n", err)
@@ -141,7 +162,7 @@ func runShow(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func (a app) runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprintln(stderr, "usage: agentlib install <namespace/name@version>")
 		return 1
@@ -159,7 +180,7 @@ func runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		return 1
 	}
 
-	result, err := install.Run(ctx, newRegistryClient(registryBaseURL()), workingDir, ref)
+	result, err := install.Run(ctx, a.registryClient(), workingDir, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "install agent: %v\n", err)
 		return 1
@@ -207,10 +228,19 @@ func registryBaseURL() string {
 	return "https://agentlib.dev"
 }
 
+func (a app) registryClient() registryClient {
+	if a.newRegistryClient != nil {
+		return a.newRegistryClient(registryBaseURL())
+	}
+
+	return registry.New(registryBaseURL())
+}
+
 func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "agentlib <command>")
 	fmt.Fprintln(writer)
 	fmt.Fprintln(writer, "Commands:")
+	fmt.Fprintln(writer, "  version")
 	fmt.Fprintln(writer, "  validate <path>")
 	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")

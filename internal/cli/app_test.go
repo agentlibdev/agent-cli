@@ -12,22 +12,20 @@ import (
 )
 
 func TestRunSearchFiltersAgents(t *testing.T) {
-	previousFactory := newRegistryClient
-	newRegistryClient = func(string) registryClient {
-		return fakeRegistryClient{
-			agents: []registry.AgentSummary{
-				{Namespace: "raul", Name: "code-reviewer", LatestVersion: "0.4.0", Title: "Code Reviewer", Description: "Reviews code changes."},
-				{Namespace: "raul", Name: "docs-writer", LatestVersion: "0.2.0", Title: "Docs Writer", Description: "Drafts documentation."},
-			},
-		}
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{
+				agents: []registry.AgentSummary{
+					{Namespace: "raul", Name: "code-reviewer", LatestVersion: "0.4.0", Title: "Code Reviewer", Description: "Reviews code changes."},
+					{Namespace: "raul", Name: "docs-writer", LatestVersion: "0.2.0", Title: "Docs Writer", Description: "Drafts documentation."},
+				},
+			}
+		},
 	}
-	t.Cleanup(func() {
-		newRegistryClient = previousFactory
-	})
 
 	var stdout strings.Builder
 	var stderr strings.Builder
-	exitCode := Run(context.Background(), []string{"search", "docs"}, &stdout, &stderr)
+	exitCode := cli.Run(context.Background(), []string{"search", "docs"}, &stdout, &stderr)
 	if exitCode != 0 {
 		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
 	}
@@ -36,6 +34,19 @@ func TestRunSearchFiltersAgents(t *testing.T) {
 	}
 	if strings.Contains(stdout.String(), "raul/code-reviewer@0.4.0") {
 		t.Fatalf("stdout = %q, did not expect code-reviewer result", stdout.String())
+	}
+}
+
+func TestRunVersionPrintsVersion(t *testing.T) {
+	var stdout strings.Builder
+	var stderr strings.Builder
+
+	exitCode := Run(context.Background(), []string{"version"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if got := stdout.String(); got != "agentlib dev\n" {
+		t.Fatalf("stdout = %q, want %q", got, "agentlib dev\n")
 	}
 }
 
@@ -72,6 +83,9 @@ func TestRunRemoveDeletesInstalledVersion(t *testing.T) {
 	}
 	if _, err := os.Stat(installedPath); !os.IsNotExist(err) {
 		t.Fatalf("installed path still exists: %v", err)
+	}
+	if _, err := os.Stat(lockfilePath); !os.IsNotExist(err) {
+		t.Fatalf("lockfile still exists: %v", err)
 	}
 }
 
