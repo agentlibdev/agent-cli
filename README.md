@@ -64,3 +64,30 @@ goreleaser release --snapshot --clean
 ```
 
 The release config builds `agentlib` for linux, darwin, and windows on `amd64` and `arm64`, then emits per-platform archives plus a checksum file.
+
+## Install
+
+The POSIX installer downloads the matching GitHub Releases archive and checksum, verifies the download, and installs `agentlib` into `~/.agentlib/bin`.
+
+Install a pinned release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/agentlibdev/agent-cli/v0.1.0/scripts/install.sh | sh -s -- v0.1.0
+```
+
+The same pinned install works with `wget`:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/agentlibdev/agent-cli/v0.1.0/scripts/install.sh | sh -s -- v0.1.0
+```
+
+Replace `v0.1.0` in both places with the release you want to install. If you omit the final version argument, the script falls back to its `latest` behavior.
+
+Add the install directory to `PATH` in your shell startup file if needed:
+
+```bash
+echo 'export PATH="$HOME/.agentlib/bin:$PATH"' >> ~/.bashrc
+export PATH="$HOME/.agentlib/bin:$PATH"
+```
+
+Use `~/.zshrc` instead of `~/.bashrc` on `zsh`, or `~/.profile` as a more shell-agnostic fallback. Then open a new shell or source the file you updated.
