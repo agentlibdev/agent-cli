@@ -8,6 +8,7 @@ The repository is named `agent-cli`, but the distributed end-user binary is name
 
 Current commands:
 
+- `agentlib version`
 - `agentlib validate ./agent.yaml`
 - `agentlib search reviewer`
 - `agentlib show raul/code-reviewer@0.4.0`
