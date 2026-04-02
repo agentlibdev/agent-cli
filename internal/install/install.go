@@ -29,7 +29,7 @@ type Lockfile struct {
 	} `json:"agent"`
 }
 
-func Run(ctx context.Context, registryClient Registry, workingDir string, ref agentref.Ref) (Result, error) {
+func Run(ctx context.Context, registryClient Registry, root string, ref agentref.Ref) (Result, error) {
 	_, err := registryClient.FetchVersion(ctx, ref)
 	if err != nil {
 		return Result{}, err
@@ -40,7 +40,7 @@ func Run(ctx context.Context, registryClient Registry, workingDir string, ref ag
 		return Result{}, err
 	}
 
-	installRoot := filepath.Join(workingDir, ".agentlib", "agents", ref.Namespace, ref.Name, ref.Version)
+	installRoot := filepath.Join(root, "agents", ref.Namespace, ref.Name, ref.Version)
 	if err := os.MkdirAll(installRoot, 0o755); err != nil {
 		return Result{}, err
 	}
@@ -65,7 +65,7 @@ func Run(ctx context.Context, registryClient Registry, workingDir string, ref ag
 	lockfile.Agent.Name = ref.Name
 	lockfile.Agent.Version = ref.Version
 
-	lockfilePath := filepath.Join(workingDir, ".agentlib", "agent.lock.json")
+	lockfilePath := filepath.Join(root, "agent.lock.json")
 	lockfileBytes, err := json.MarshalIndent(lockfile, "", "  ")
 	if err != nil {
 		return Result{}, err
@@ -77,13 +77,13 @@ func Run(ctx context.Context, registryClient Registry, workingDir string, ref ag
 	return Result{Root: installRoot}, nil
 }
 
-func Remove(workingDir string, ref agentref.Ref) error {
-	installRoot := filepath.Join(workingDir, ".agentlib", "agents", ref.Namespace, ref.Name, ref.Version)
+func Remove(root string, ref agentref.Ref) error {
+	installRoot := filepath.Join(root, "agents", ref.Namespace, ref.Name, ref.Version)
 	if err := os.RemoveAll(installRoot); err != nil {
 		return err
 	}
 
-	lockfilePath := filepath.Join(workingDir, ".agentlib", "agent.lock.json")
+	lockfilePath := filepath.Join(root, "agent.lock.json")
 	lockfileBytes, err := os.ReadFile(lockfilePath)
 	if err != nil {
 		if os.IsNotExist(err) {

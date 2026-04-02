@@ -54,17 +54,17 @@ func TestInstallerWritesArtifactsAndLockfile(t *testing.T) {
 		t.Fatalf("Run returned error: %v", err)
 	}
 
-	agentPath := filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0", "README.md")
+	agentPath := filepath.Join(root, "agents", "raul", "code-reviewer", "0.4.0", "README.md")
 	if _, err := os.Stat(agentPath); err != nil {
 		t.Fatalf("installed README missing: %v", err)
 	}
 
-	lockfilePath := filepath.Join(root, ".agentlib", "agent.lock.json")
+	lockfilePath := filepath.Join(root, "agent.lock.json")
 	if _, err := os.Stat(lockfilePath); err != nil {
 		t.Fatalf("lockfile missing: %v", err)
 	}
 
-	if result.Root != filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0") {
+	if result.Root != filepath.Join(root, "agents", "raul", "code-reviewer", "0.4.0") {
 		t.Fatalf("Root = %q", result.Root)
 	}
 }
@@ -72,16 +72,16 @@ func TestInstallerWritesArtifactsAndLockfile(t *testing.T) {
 func TestRemoveDeletesVersionAndMatchingLockfile(t *testing.T) {
 	root := t.TempDir()
 
-	versionDir := filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	versionDir := filepath.Join(root, "agents", "raul", "code-reviewer", "0.4.0")
 	if err := os.MkdirAll(versionDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
-	otherVersionDir := filepath.Join(root, ".agentlib", "agents", "raul", "code-reviewer", "0.3.0")
+	otherVersionDir := filepath.Join(root, "agents", "raul", "code-reviewer", "0.3.0")
 	if err := os.MkdirAll(otherVersionDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 
-	lockfilePath := filepath.Join(root, ".agentlib", "agent.lock.json")
+	lockfilePath := filepath.Join(root, "agent.lock.json")
 	lockfile := Lockfile{Version: 1}
 	lockfile.Agent.Namespace = "raul"
 	lockfile.Agent.Name = "code-reviewer"

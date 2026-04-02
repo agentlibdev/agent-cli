@@ -8,6 +8,7 @@ The repository is named `agent-cli`, but the distributed end-user binary is name
 
 Current commands:
 
+- `agentlib init`
 - `agentlib version`
 - `agentlib validate ./agent.yaml`
 - `agentlib search reviewer`
@@ -29,21 +30,51 @@ For local development you can point it at a local Worker:
 export AGENTLIB_BASE_URL=http://127.0.0.1:8787
 ```
 
-## Local install layout
+## Install modes
 
-`install` writes artifacts into:
-
-```text
-.agentlib/agents/<namespace>/<name>/<version>/
-```
-
-and writes a lockfile to:
+`install` and `remove` use the user-global store by default:
 
 ```text
-.agentlib/agent.lock.json
+~/.agentlib/agents/<namespace>/<name>/<version>/
+~/.agentlib/agent.lock.json
 ```
 
-`remove` deletes one exact installed version from that layout and removes the lockfile if it points at the same exact version.
+This makes the CLI predictable no matter which directory you run it from.
+
+For project-local installs:
+
+1. Initialize the project once:
+
+```bash
+agentlib init
+```
+
+That writes the project marker to:
+
+```text
+.agentlib/project.json
+```
+
+2. Install locally:
+
+```bash
+agentlib install --local raul/code-reviewer@0.4.0
+```
+
+That writes artifacts under:
+
+```text
+<project>/.agentlib/agents/<namespace>/<name>/<version>/
+<project>/.agentlib/agent.lock.json
+```
+
+You can also override the local store root when using `--local`:
+
+```bash
+agentlib install --local --install-dir vendor/agentlib raul/code-reviewer@0.4.0
+```
+
+`--install-dir` requires `--local`. Use `--global` or `-g` to be explicit about the default global mode.
 
 ## Development
 

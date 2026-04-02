@@ -2,10 +2,10 @@ package cli
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/agentlibdev/agent-cli/internal/agentref"
@@ -45,6 +45,8 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return a.runVersion(args[1:], stdout, stderr)
 	case "validate":
 		return runValidate(args[1:], stdout, stderr)
+	case "init":
+		return runInit(args[1:], stdout, stderr)
 	case "search":
 		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
@@ -163,45 +165,85 @@ func (a app) runShow(ctx context.Context, args []string, stdout, stderr io.Write
 }
 
 func (a app) runInstall(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "usage: agentlib install <namespace/name@version>")
+	flags := flag.NewFlagSet("install", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	local := flags.Bool("local", false, "")
+	global := flags.Bool("global", false, "")
+	flags.BoolVar(global, "g", false, "")
+	installDir := flags.String("install-dir", "", "")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		return 1
+	}
+	if flags.NArg() != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 		return 1
 	}
 
-	ref, err := agentref.Parse(args[0])
+	resolvedTarget, err := resolveInstallTarget(*local, *global, *installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	ref, err := agentref.Parse(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintf(stderr, "parse ref: %v\n", err)
 		return 1
 	}
 
-	workingDir, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
-		return 1
-	}
-
-	result, err := install.Run(ctx, a.registryClient(), workingDir, ref)
+	result, err := install.Run(ctx, a.registryClient(), resolvedTarget.Root, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "install agent: %v\n", err)
 		return 1
 	}
 
-	lockfile := filepath.Join(workingDir, ".agentlib", "agent.lock.json")
 	fmt.Fprintf(stdout, "installed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
 	fmt.Fprintf(stdout, "root: %s\n", result.Root)
-	fmt.Fprintf(stdout, "lockfile: %s\n", lockfile)
+	fmt.Fprintf(stdout, "lockfile: %s\n", resolvedTarget.LockfilePath)
 	return 0
 }
 
 func runRemove(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 1 {
-		fmt.Fprintln(stderr, "usage: agentlib remove <namespace/name@version>")
+	flags := flag.NewFlagSet("remove", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	local := flags.Bool("local", false, "")
+	global := flags.Bool("global", false, "")
+	flags.BoolVar(global, "g", false, "")
+	installDir := flags.String("install-dir", "", "")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		return 1
+	}
+	if flags.NArg() != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 		return 1
 	}
 
-	ref, err := agentref.Parse(args[0])
+	resolvedTarget, err := resolveInstallTarget(*local, *global, *installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	ref, err := agentref.Parse(flags.Arg(0))
 	if err != nil {
 		fmt.Fprintf(stderr, "parse ref: %v\n", err)
+		return 1
+	}
+
+	if err := install.Remove(resolvedTarget.Root, ref); err != nil {
+		fmt.Fprintf(stderr, "remove agent: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "removed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
+	return 0
+}
+
+func runInit(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 0 {
+		fmt.Fprintln(stderr, "usage: agentlib init")
 		return 1
 	}
 
@@ -211,12 +253,13 @@ func runRemove(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if err := install.Remove(workingDir, ref); err != nil {
-		fmt.Fprintf(stderr, "remove agent: %v\n", err)
+	projectFile, err := install.InitProject(workingDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "init project: %v\n", err)
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "removed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
+	fmt.Fprintf(stdout, "initialized: %s\n", projectFile)
 	return 0
 }
 
@@ -242,10 +285,11 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "Commands:")
 	fmt.Fprintln(writer, "  version")
 	fmt.Fprintln(writer, "  validate <path>")
+	fmt.Fprintln(writer, "  init")
 	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
-	fmt.Fprintln(writer, "  install <namespace/name@version>")
-	fmt.Fprintln(writer, "  remove <namespace/name@version>")
+	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+	fmt.Fprintln(writer, "  remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 }
 
 func matchesSearch(agent registry.AgentSummary, query string) bool {
@@ -257,4 +301,18 @@ func matchesSearch(agent registry.AgentSummary, query string) bool {
 	}, " "))
 
 	return strings.Contains(candidate, query)
+}
+
+func resolveInstallTarget(local, global bool, installDir string) (install.Target, error) {
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return install.Target{}, err
+	}
+
+	return install.ResolveTarget(install.TargetOptions{
+		WorkingDir: workingDir,
+		Local:      local,
+		Global:     global,
+		InstallDir: installDir,
+	})
 }
