@@ -9,6 +9,7 @@ The repository is named `agent-cli`, but the distributed end-user binary is name
 Current commands:
 
 - `agentlib init`
+- `agentlib targets list`
 - `agentlib version`
 - `agentlib validate ./agent.yaml`
 - `agentlib search reviewer`
@@ -75,6 +76,46 @@ agentlib install --local --install-dir vendor/agentlib raul/code-reviewer@0.4.0
 ```
 
 `--install-dir` requires `--local`. Use `--global` or `-g` to be explicit about the default global mode.
+
+## Target adapters
+
+The CLI has built-in target definitions for:
+
+- `codex`
+- `claude`
+- `gemini-cli`
+- `openclaw`
+
+List the currently known targets with:
+
+```bash
+agentlib targets list
+```
+
+The CLI can also load custom target definitions from:
+
+- global: `~/.agentlib/targets.json`
+- project: `.agentlib/targets.json`
+
+Minimal example:
+
+```json
+{
+  "targets": [
+    {
+      "id": "openclaw-local",
+      "type": "custom",
+      "format": "markdown-skill-dir",
+      "installRoot": "/home/raul/.openclaw/skills",
+      "manifestPath": "/home/raul/.openclaw/config/skills.json",
+      "mode": "symlink",
+      "enabled": true
+    }
+  ]
+}
+```
+
+Project targets augment the built-in and global target list; they do not replace it.
 
 ## Development
 

@@ -10,6 +10,7 @@ import (
 	"github.com/agentlibdev/agent-cli/internal/agentref"
 	"github.com/agentlibdev/agent-cli/internal/install"
 	"github.com/agentlibdev/agent-cli/internal/registry"
+	"github.com/agentlibdev/agent-cli/internal/targets"
 )
 
 func TestRunSearchFiltersAgents(t *testing.T) {
@@ -211,6 +212,35 @@ func TestRunInstallLocalWithInstallDirUsesOverride(t *testing.T) {
 
 type fakeRegistryClient struct {
 	agents []registry.AgentSummary
+}
+
+func TestRunTargetsListPrintsBuiltInsAndCustomTargets(t *testing.T) {
+	cli := app{
+		loadTargets: func(string) ([]targets.Target, error) {
+			return []targets.Target{
+				{ID: "codex", Type: targets.TypeBuiltIn, Format: "codex", Mode: "generate", Enabled: true},
+				{ID: "custom-openclaw", Type: targets.TypeCustom, Format: "markdown-skill-dir", Mode: "symlink", Enabled: false},
+			}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"targets", "list"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "codex") {
+		t.Fatalf("stdout = %q, want codex", output)
+	}
+	if !strings.Contains(output, "custom-openclaw") {
+		t.Fatalf("stdout = %q, want custom target", output)
+	}
+	if !strings.Contains(output, "disabled") {
+		t.Fatalf("stdout = %q, want disabled marker", output)
+	}
 }
 
 func (client fakeRegistryClient) FetchVersion(context.Context, agentref.Ref) (registry.Version, error) {

@@ -12,6 +12,7 @@ import (
 	"github.com/agentlibdev/agent-cli/internal/install"
 	"github.com/agentlibdev/agent-cli/internal/manifest"
 	"github.com/agentlibdev/agent-cli/internal/registry"
+	"github.com/agentlibdev/agent-cli/internal/targets"
 	"github.com/agentlibdev/agent-cli/internal/version"
 )
 
@@ -24,6 +25,7 @@ type registryClient interface {
 
 type app struct {
 	newRegistryClient func(baseURL string) registryClient
+	loadTargets       func(projectDir string) ([]targets.Target, error)
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -31,6 +33,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		newRegistryClient: func(baseURL string) registryClient {
 			return registry.New(baseURL)
 		},
+		loadTargets: targets.Load,
 	}.Run(ctx, args, stdout, stderr)
 }
 
@@ -47,6 +50,8 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return runValidate(args[1:], stdout, stderr)
 	case "init":
 		return runInit(args[1:], stdout, stderr)
+	case "targets":
+		return a.runTargets(args[1:], stdout, stderr)
 	case "search":
 		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
@@ -263,6 +268,40 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func (a app) runTargets(args []string, stdout, stderr io.Writer) int {
+	if len(args) != 1 || args[0] != "list" {
+		fmt.Fprintln(stderr, "usage: agentlib targets list")
+		return 1
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
+		return 1
+	}
+
+	loadTargets := a.loadTargets
+	if loadTargets == nil {
+		loadTargets = targets.Load
+	}
+
+	items, err := loadTargets(workingDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "load targets: %v\n", err)
+		return 1
+	}
+
+	for _, item := range items {
+		state := "enabled"
+		if !item.Enabled {
+			state = "disabled"
+		}
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n", item.ID, item.Type, item.Format, item.Mode, state)
+	}
+
+	return 0
+}
+
 func registryBaseURL() string {
 	if value := os.Getenv("AGENTLIB_BASE_URL"); value != "" {
 		return value
@@ -288,6 +327,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  init")
 	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
+	fmt.Fprintln(writer, "  targets list")
 	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 	fmt.Fprintln(writer, "  remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 }
