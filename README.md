@@ -2,6 +2,8 @@
 
 Go command-line client for AgentLib.
 
+The repository is named `agent-cli`, but the distributed end-user binary is named `agentlib`.
+
 ## MVP scope
 
 Current commands:
@@ -52,3 +54,13 @@ export GOCACHE=/tmp/agent-cli-go-build
 go test ./...
 go build ./cmd/agentlib
 ```
+
+## Release packaging
+
+Local snapshot packaging uses GoReleaser:
+
+```bash
+goreleaser release --snapshot --clean
+```
+
+The release config builds `agentlib` for linux, darwin, and windows on `amd64` and `arm64`, then emits per-platform archives plus a checksum file.

@@ -1,0 +1,35 @@
+version: 2
+
+project_name: agentlib
+
+builds:
+  - id: agentlib
+    main: ./cmd/agentlib
+    binary: agentlib
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/agentlibdev/agent-cli/internal/version.Version={{.Version}} -X github.com/agentlibdev/agent-cli/internal/version.Commit={{.Commit}} -X github.com/agentlibdev/agent-cli/internal/version.Date={{.Date}}
+
+archives:
+  - id: agentlib
+    builds:
+      - agentlib
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files: []
+
+checksum:
+  name_template: "{{ .ProjectName }}_checksums.txt"
