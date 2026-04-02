@@ -56,6 +56,14 @@ go test ./...
 go build ./cmd/agentlib
 ```
 
+Or use the Docker build environment:
+
+```bash
+docker compose run --rm go-build
+```
+
+That command runs `go test ./...` and `go build ./cmd/agentlib` inside the container while reusing Docker volumes for the Go module and build caches.
+
 ## Release packaging
 
 Local snapshot packaging uses GoReleaser:

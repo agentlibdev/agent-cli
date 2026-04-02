@@ -1,0 +1,9 @@
+FROM golang:1.26.1-bookworm
+
+WORKDIR /workspace
+
+ENV CGO_ENABLED=0
+
+RUN git config --global --add safe.directory /workspace
+
+CMD ["sh", "-c", "go test ./... && go build ./cmd/agentlib"]

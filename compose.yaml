@@ -1,0 +1,17 @@
+services:
+  go-build:
+    build:
+      context: .
+      dockerfile: Dockerfile.go-build
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    environment:
+      GOCACHE: /root/.cache/go-build
+    command: sh -c "go test ./... && go build ./cmd/agentlib"
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
