@@ -26,6 +26,7 @@ type registryClient interface {
 type app struct {
 	newRegistryClient func(baseURL string) registryClient
 	loadTargets       func(projectDir string) ([]targets.Target, error)
+	detectTargets     func(projectDir string) ([]targets.Detection, error)
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -33,7 +34,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		newRegistryClient: func(baseURL string) registryClient {
 			return registry.New(baseURL)
 		},
-		loadTargets: targets.Load,
+		loadTargets:   targets.Load,
+		detectTargets: targets.Detect,
 	}.Run(ctx, args, stdout, stderr)
 }
 
@@ -52,6 +54,8 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return runInit(args[1:], stdout, stderr)
 	case "targets":
 		return a.runTargets(args[1:], stdout, stderr)
+	case "enable":
+		return a.runEnable(args[1:], stdout, stderr)
 	case "search":
 		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
@@ -246,6 +250,59 @@ func runRemove(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func (a app) runEnable(args []string, stdout, stderr io.Writer) int {
+	local, global, installDir, targetID, refValue, err := parseEnableArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
+		return 1
+	}
+
+	resolvedTarget, err := resolveInstallTarget(local, global, installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	ref, err := agentref.Parse(refValue)
+	if err != nil {
+		fmt.Fprintf(stderr, "parse ref: %v\n", err)
+		return 1
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
+		return 1
+	}
+
+	loadTargets := a.loadTargets
+	if loadTargets == nil {
+		loadTargets = targets.Load
+	}
+
+	items, err := loadTargets(workingDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "load targets: %v\n", err)
+		return 1
+	}
+
+	selected, ok := findTarget(items, targetID)
+	if !ok {
+		fmt.Fprintf(stderr, "target %q not found\n", targetID)
+		return 1
+	}
+
+	result, err := targets.Enable(resolvedTarget.Root, selected, ref)
+	if err != nil {
+		fmt.Fprintf(stderr, "enable target: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "enabled: %s/%s@%s -> %s\n", ref.Namespace, ref.Name, ref.Version, selected.ID)
+	fmt.Fprintf(stdout, "path: %s\n", result.Path)
+	return 0
+}
+
 func runInit(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 0 {
 		fmt.Fprintln(stderr, "usage: agentlib init")
@@ -269,8 +326,8 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 }
 
 func (a app) runTargets(args []string, stdout, stderr io.Writer) int {
-	if len(args) != 1 || args[0] != "list" {
-		fmt.Fprintln(stderr, "usage: agentlib targets list")
+	if len(args) != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib targets <list|detect>")
 		return 1
 	}
 
@@ -285,18 +342,39 @@ func (a app) runTargets(args []string, stdout, stderr io.Writer) int {
 		loadTargets = targets.Load
 	}
 
-	items, err := loadTargets(workingDir)
-	if err != nil {
-		fmt.Fprintf(stderr, "load targets: %v\n", err)
-		return 1
-	}
-
-	for _, item := range items {
-		state := "enabled"
-		if !item.Enabled {
-			state = "disabled"
+	switch args[0] {
+	case "list":
+		items, err := loadTargets(workingDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "load targets: %v\n", err)
+			return 1
 		}
-		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n", item.ID, item.Type, item.Format, item.Mode, state)
+
+		for _, item := range items {
+			state := "enabled"
+			if !item.Enabled {
+				state = "disabled"
+			}
+			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n", item.ID, item.Type, item.Format, item.Mode, state)
+		}
+	case "detect":
+		detectTargets := a.detectTargets
+		if detectTargets == nil {
+			detectTargets = targets.Detect
+		}
+
+		items, err := detectTargets(workingDir)
+		if err != nil {
+			fmt.Fprintf(stderr, "detect targets: %v\n", err)
+			return 1
+		}
+
+		for _, item := range items {
+			fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\t%s\n", item.Target.ID, item.Target.Type, item.Target.Format, item.Status, item.Evidence, item.Path)
+		}
+	default:
+		fmt.Fprintln(stderr, "usage: agentlib targets <list|detect>")
+		return 1
 	}
 
 	return 0
@@ -328,6 +406,8 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
 	fmt.Fprintln(writer, "  targets list")
+	fmt.Fprintln(writer, "  targets detect")
+	fmt.Fprintln(writer, "  enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 	fmt.Fprintln(writer, "  remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 }
@@ -355,4 +435,57 @@ func resolveInstallTarget(local, global bool, installDir string) (install.Target
 		Global:     global,
 		InstallDir: installDir,
 	})
+}
+
+func findTarget(items []targets.Target, id string) (targets.Target, bool) {
+	for _, item := range items {
+		if item.ID == id {
+			return item, true
+		}
+	}
+
+	return targets.Target{}, false
+}
+
+func parseEnableArgs(args []string) (bool, bool, string, string, string, error) {
+	local := false
+	global := false
+	installDir := ""
+	targetID := ""
+	refValue := ""
+
+	for index := 0; index < len(args); index++ {
+		switch args[index] {
+		case "--local":
+			local = true
+		case "--global", "-g":
+			global = true
+		case "--install-dir":
+			index++
+			if index >= len(args) {
+				return false, false, "", "", "", fmt.Errorf("missing install dir")
+			}
+			installDir = args[index]
+		case "--target":
+			index++
+			if index >= len(args) {
+				return false, false, "", "", "", fmt.Errorf("missing target id")
+			}
+			targetID = args[index]
+		default:
+			if strings.HasPrefix(args[index], "-") {
+				return false, false, "", "", "", fmt.Errorf("unknown flag %s", args[index])
+			}
+			if refValue != "" {
+				return false, false, "", "", "", fmt.Errorf("multiple refs")
+			}
+			refValue = args[index]
+		}
+	}
+
+	if refValue == "" || targetID == "" {
+		return false, false, "", "", "", fmt.Errorf("missing required args")
+	}
+
+	return local, global, installDir, targetID, refValue, nil
 }

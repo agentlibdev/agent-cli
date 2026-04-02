@@ -10,6 +10,8 @@ Current commands:
 
 - `agentlib init`
 - `agentlib targets list`
+- `agentlib targets detect`
+- `agentlib enable --target codex-local raul/code-reviewer@0.4.0`
 - `agentlib version`
 - `agentlib validate ./agent.yaml`
 - `agentlib search reviewer`
@@ -91,6 +93,35 @@ List the currently known targets with:
 ```bash
 agentlib targets list
 ```
+
+Detect which of those targets appear to be present on the current machine with:
+
+```bash
+agentlib targets detect
+```
+
+The first detection pass is intentionally simple:
+
+- built-in targets are detected from known commands in `PATH`
+- custom targets are detected from an existing `installRoot` or `manifestPath`
+
+Enable an already installed package into a configured target with:
+
+```bash
+agentlib enable --target openclaw-local raul/code-reviewer@0.4.0
+```
+
+`enable` reads the package from the AgentLib store:
+
+- global by default: `~/.agentlib/agents/...`
+- local with `--local`
+
+and materializes it into the target `installRoot` using the target mode:
+
+- `symlink`
+- `copy`
+
+`generate` is reserved for future adapter-specific emitters.
 
 The CLI can also load custom target definitions from:
 

@@ -243,6 +243,76 @@ func TestRunTargetsListPrintsBuiltInsAndCustomTargets(t *testing.T) {
 	}
 }
 
+func TestRunTargetsDetectPrintsDetectedAndMissingTargets(t *testing.T) {
+	cli := app{
+		detectTargets: func(string) ([]targets.Detection, error) {
+			return []targets.Detection{
+				{
+					Target:   targets.Target{ID: "codex", Type: targets.TypeBuiltIn, Format: "codex", Mode: "generate", Enabled: true},
+					Detected: true,
+					Status:   "detected",
+					Path:     "/usr/local/bin/codex",
+					Evidence: "command",
+				},
+				{
+					Target:   targets.Target{ID: "openclaw", Type: targets.TypeBuiltIn, Format: "openclaw", Mode: "generate", Enabled: true},
+					Detected: false,
+					Status:   "missing",
+				},
+			}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"targets", "detect"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "codex") || !strings.Contains(output, "/usr/local/bin/codex") {
+		t.Fatalf("stdout = %q, want detected codex", output)
+	}
+	if !strings.Contains(output, "openclaw") || !strings.Contains(output, "missing") {
+		t.Fatalf("stdout = %q, want missing openclaw", output)
+	}
+}
+
+func TestRunEnableUsesGlobalStoreAndConfiguredTarget(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	targetDir := filepath.Join(t.TempDir(), "target-skills")
+	cli := app{
+		loadTargets: func(string) ([]targets.Target, error) {
+			return []targets.Target{
+				{ID: "codex-local", Type: targets.TypeCustom, Format: "markdown-skill-dir", InstallRoot: targetDir, Mode: "symlink", Enabled: true},
+			}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"enable", ref, "--target", "codex-local"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "enabled: raul/code-reviewer@0.4.0 -> codex-local") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
 func (client fakeRegistryClient) FetchVersion(context.Context, agentref.Ref) (registry.Version, error) {
 	return registry.Version{
 		Namespace: "raul",

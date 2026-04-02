@@ -23,6 +23,7 @@ type Target struct {
 	ManifestPath string `json:"manifestPath,omitempty"`
 	Mode         string `json:"mode,omitempty"`
 	Enabled      bool   `json:"enabled"`
+	baseDir      string `json:"-"`
 }
 
 type fileConfig struct {
@@ -77,6 +78,17 @@ func loadFile(path string) ([]Target, error) {
 	var config fileConfig
 	if err := json.Unmarshal(content, &config); err != nil {
 		return nil, fmt.Errorf("parse targets config %s: %w", path, err)
+	}
+
+	baseDir := filepath.Dir(path)
+	for index := range config.Targets {
+		config.Targets[index].baseDir = baseDir
+		if config.Targets[index].InstallRoot != "" && !filepath.IsAbs(config.Targets[index].InstallRoot) {
+			config.Targets[index].InstallRoot = filepath.Join(baseDir, config.Targets[index].InstallRoot)
+		}
+		if config.Targets[index].ManifestPath != "" && !filepath.IsAbs(config.Targets[index].ManifestPath) {
+			config.Targets[index].ManifestPath = filepath.Join(baseDir, config.Targets[index].ManifestPath)
+		}
 	}
 
 	return config.Targets, nil
