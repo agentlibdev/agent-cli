@@ -81,7 +81,7 @@ The same pinned install works with `wget`:
 wget -qO- https://raw.githubusercontent.com/agentlibdev/agent-cli/v0.1.0/scripts/install.sh | sh -s -- v0.1.0
 ```
 
-Replace `v0.1.0` in both places with the release you want to install. If you omit the final version argument, the script falls back to its `latest` behavior.
+Replace `v0.1.0` in both places with the release you want to install.
 
 Add the install directory to `PATH` in your shell startup file if needed:
 
@@ -91,3 +91,16 @@ export PATH="$HOME/.agentlib/bin:$PATH"
 ```
 
 Use `~/.zshrc` instead of `~/.bashrc` on `zsh`, or `~/.profile` as a more shell-agnostic fallback. Then open a new shell or source the file you updated.
+
+The Windows installer follows the same release flow, but downloads the `.zip` archive and installs `agentlib.exe` into `%USERPROFILE%\\.agentlib\\bin`.
+
+Install a pinned release from PowerShell:
+
+```powershell
+Invoke-WebRequest https://raw.githubusercontent.com/agentlibdev/agent-cli/v0.1.0/scripts/install.ps1 -OutFile install.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version v0.1.0
+```
+
+Replace `v0.1.0` in both places with the release you want to install.
+
+If `%USERPROFILE%\\.agentlib\\bin` is not already on your user PATH, add it through the Windows Environment Variables UI, then open a new PowerShell session.
