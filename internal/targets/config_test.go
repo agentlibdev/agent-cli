@@ -16,11 +16,16 @@ func TestLoadReturnsBuiltInsWhenNoConfigExists(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if len(items) != 4 {
-		t.Fatalf("len(items) = %d, want 4", len(items))
+	if len(items) != 8 {
+		t.Fatalf("len(items) = %d, want 8", len(items))
 	}
-	if items[0].ID != "claude" && items[0].ID != "codex" && items[0].ID != "gemini-cli" && items[0].ID != "openclaw" {
-		t.Fatalf("unexpected first target: %+v", items[0])
+	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "windsurf") {
+		t.Fatalf("items missing expected built-ins: %+v", items)
+	}
+
+	codex := findByID(items, "codex")
+	if codex.InstallRoot != filepath.Join(home, ".agents", "skills") {
+		t.Fatalf("codex.InstallRoot = %q", codex.InstallRoot)
 	}
 }
 
@@ -93,4 +98,13 @@ func containsID(items []Target, id string) bool {
 		}
 	}
 	return false
+}
+
+func findByID(items []Target, id string) Target {
+	for _, item := range items {
+		if item.ID == id {
+			return item
+		}
+	}
+	return Target{}
 }

@@ -17,8 +17,10 @@ const (
 
 type Target struct {
 	ID           string `json:"id"`
+	Name         string `json:"name,omitempty"`
 	Type         Type   `json:"type"`
 	Format       string `json:"format"`
+	RelativePath string `json:"relativePath,omitempty"`
 	InstallRoot  string `json:"installRoot,omitempty"`
 	ManifestPath string `json:"manifestPath,omitempty"`
 	Mode         string `json:"mode,omitempty"`
@@ -31,12 +33,12 @@ type fileConfig struct {
 }
 
 func Load(projectDir string) ([]Target, error) {
-	items := append([]Target{}, builtIns()...)
-
 	home := os.Getenv("HOME")
 	if home == "" {
 		return nil, fmt.Errorf("HOME is not set")
 	}
+
+	items := append([]Target{}, builtIns(home)...)
 
 	globalItems, err := loadFile(filepath.Join(home, ".agentlib", "targets.json"))
 	if err != nil {
@@ -57,12 +59,88 @@ func Load(projectDir string) ([]Target, error) {
 	return items, nil
 }
 
-func builtIns() []Target {
+func builtIns(home string) []Target {
 	return []Target{
-		{ID: "claude", Type: TypeBuiltIn, Format: "claude", Mode: "generate", Enabled: true},
-		{ID: "codex", Type: TypeBuiltIn, Format: "codex", Mode: "generate", Enabled: true},
-		{ID: "gemini-cli", Type: TypeBuiltIn, Format: "gemini-cli", Mode: "generate", Enabled: true},
-		{ID: "openclaw", Type: TypeBuiltIn, Format: "openclaw", Mode: "generate", Enabled: true},
+		{
+			ID:           "antigravity",
+			Name:         "Antigravity",
+			Type:         TypeBuiltIn,
+			Format:       "antigravity",
+			RelativePath: ".gemini/antigravity/skills",
+			InstallRoot:  filepath.Join(home, ".gemini", "antigravity", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "claude-code",
+			Name:         "Claude Code",
+			Type:         TypeBuiltIn,
+			Format:       "claude-code",
+			RelativePath: ".claude/skills",
+			InstallRoot:  filepath.Join(home, ".claude", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "cursor",
+			Name:         "Cursor",
+			Type:         TypeBuiltIn,
+			Format:       "cursor",
+			RelativePath: ".cursor/skills",
+			InstallRoot:  filepath.Join(home, ".cursor", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "codex",
+			Name:         "Codex",
+			Type:         TypeBuiltIn,
+			Format:       "codex",
+			RelativePath: ".agents/skills",
+			InstallRoot:  filepath.Join(home, ".agents", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "gemini-cli",
+			Name:         "Gemini CLI",
+			Type:         TypeBuiltIn,
+			Format:       "gemini-cli",
+			RelativePath: ".gemini/skills",
+			InstallRoot:  filepath.Join(home, ".gemini", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "github-copilot",
+			Name:         "GitHub Copilot",
+			Type:         TypeBuiltIn,
+			Format:       "github-copilot",
+			RelativePath: ".copilot/skills",
+			InstallRoot:  filepath.Join(home, ".copilot", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "opencode",
+			Name:         "OpenCode",
+			Type:         TypeBuiltIn,
+			Format:       "opencode",
+			RelativePath: ".config/opencode/skills",
+			InstallRoot:  filepath.Join(home, ".config", "opencode", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "windsurf",
+			Name:         "Windsurf",
+			Type:         TypeBuiltIn,
+			Format:       "windsurf",
+			RelativePath: ".codeium/windsurf/skills",
+			InstallRoot:  filepath.Join(home, ".codeium", "windsurf", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
 	}
 }
 

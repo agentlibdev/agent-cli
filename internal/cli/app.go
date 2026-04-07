@@ -439,12 +439,35 @@ func resolveInstallTarget(local, global bool, installDir string) (install.Target
 
 func findTarget(items []targets.Target, id string) (targets.Target, bool) {
 	for _, item := range items {
-		if item.ID == id {
+		if item.ID == id || targetAliasMatches(item.ID, id) {
 			return item, true
 		}
 	}
 
 	return targets.Target{}, false
+}
+
+func targetAliasMatches(canonicalID string, value string) bool {
+	for _, alias := range targetAliases(canonicalID) {
+		if alias == value {
+			return true
+		}
+	}
+
+	return false
+}
+
+func targetAliases(canonicalID string) []string {
+	switch canonicalID {
+	case "claude-code":
+		return []string{"claude"}
+	case "gemini-cli":
+		return []string{"gemini"}
+	case "github-copilot":
+		return []string{"copilot", "github-copilot-chat"}
+	default:
+		return nil
+	}
 }
 
 func parseEnableArgs(args []string) (bool, bool, string, string, string, error) {

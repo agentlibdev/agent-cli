@@ -112,6 +112,42 @@ func TestEnableTargetRejectsMissingInstalledPackage(t *testing.T) {
 	}
 }
 
+func TestEnableBuiltInCodexWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	items, err := Load(t.TempDir())
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+
+	store := filepath.Join(home, ".agentlib")
+	ref := mustRef(t, "raul/code-reviewer@0.4.0")
+	sourceRoot := filepath.Join(store, "agents", ref.Namespace, ref.Name, ref.Version)
+	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	result, err := Enable(store, findByID(items, "codex"), ref)
+	if err != nil {
+		t.Fatalf("Enable returned error: %v", err)
+	}
+
+	info, err := os.Lstat(result.Path)
+	if err != nil {
+		t.Fatalf("Lstat returned error: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("mode = %v, want symlink", info.Mode())
+	}
+	if result.Path != filepath.Join(home, ".agents", "skills", "raul", "code-reviewer", "0.4.0") {
+		t.Fatalf("Path = %q", result.Path)
+	}
+}
+
 func mustRef(t *testing.T, value string) agentref.Ref {
 	t.Helper()
 	ref, err := agentref.Parse(value)

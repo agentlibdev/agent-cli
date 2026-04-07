@@ -38,12 +38,12 @@ func DetectWithLookups(
 		}
 
 		if item.Type == TypeBuiltIn {
-			path, ok := detectBuiltIn(item.ID, lookPath)
+			path, evidence, ok := detectBuiltIn(item, lookPath, stat)
 			if ok {
 				detection.Detected = true
 				detection.Status = "detected"
 				detection.Path = path
-				detection.Evidence = "command"
+				detection.Evidence = evidence
 			}
 			detections = append(detections, detection)
 			continue
@@ -75,30 +75,51 @@ func DetectWithLookups(
 	return detections, nil
 }
 
-func detectBuiltIn(id string, lookPath func(string) (string, error)) (string, bool) {
+func detectBuiltIn(target Target, lookPath func(string) (string, error), stat func(string) (os.FileInfo, error)) (string, string, bool) {
+	id := target.ID
 	for _, candidate := range builtInCommands(id) {
 		path, err := lookPath(candidate)
 		if err == nil {
-			return path, true
+			return path, "command", true
 		}
 		if err != nil && !errors.Is(err, exec.ErrNotFound) {
 			continue
 		}
 	}
 
-	return "", false
+	if target.InstallRoot != "" {
+		if _, err := stat(target.InstallRoot); err == nil {
+			return target.InstallRoot, "installRoot", true
+		}
+	}
+
+	if target.ManifestPath != "" {
+		if _, err := stat(target.ManifestPath); err == nil {
+			return target.ManifestPath, "manifestPath", true
+		}
+	}
+
+	return "", "", false
 }
 
 func builtInCommands(id string) []string {
 	switch id {
+	case "antigravity":
+		return []string{"antigravity"}
+	case "claude-code":
+		return []string{"claude"}
+	case "cursor":
+		return []string{"cursor"}
 	case "codex":
 		return []string{"codex"}
-	case "claude":
-		return []string{"claude"}
 	case "gemini-cli":
 		return []string{"gemini", "gemini-cli"}
-	case "openclaw":
-		return []string{"openclaw"}
+	case "github-copilot":
+		return []string{"github-copilot", "copilot"}
+	case "opencode":
+		return []string{"opencode"}
+	case "windsurf":
+		return []string{"windsurf"}
 	default:
 		return []string{id}
 	}

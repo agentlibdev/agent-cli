@@ -83,10 +83,14 @@ agentlib install --local --install-dir vendor/agentlib raul/code-reviewer@0.4.0
 
 The CLI has built-in target definitions for:
 
+- `antigravity`
+- `claude-code`
+- `cursor`
 - `codex`
-- `claude`
 - `gemini-cli`
-- `openclaw`
+- `github-copilot`
+- `opencode`
+- `windsurf`
 
 List the currently known targets with:
 
@@ -103,13 +107,33 @@ agentlib targets detect
 The first detection pass is intentionally simple:
 
 - built-in targets are detected from known commands in `PATH`
+- if no command is found, built-ins can still be detected from an existing default skill directory
 - custom targets are detected from an existing `installRoot` or `manifestPath`
+
+Built-in targets resolve their default skill directory from `HOME`. For example:
+
+- `codex` -> `~/.agents/skills`
+- `claude-code` -> `~/.claude/skills`
+- `cursor` -> `~/.cursor/skills`
+- `gemini-cli` -> `~/.gemini/skills`
 
 Enable an already installed package into a configured target with:
 
 ```bash
 agentlib enable --target openclaw-local raul/code-reviewer@0.4.0
 ```
+
+Codex is the first built-in target that works without any custom `targets.json` entry:
+
+```bash
+agentlib enable --target codex raul/code-reviewer@0.4.0
+```
+
+Some built-ins also accept short aliases:
+
+- `claude` -> `claude-code`
+- `gemini` -> `gemini-cli`
+- `copilot` -> `github-copilot`
 
 `enable` reads the package from the AgentLib store:
 
