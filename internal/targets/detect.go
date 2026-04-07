@@ -120,6 +120,8 @@ func builtInCommands(id string) []string {
 		return []string{"opencode"}
 	case "windsurf":
 		return []string{"windsurf"}
+	case "vscode":
+		return []string{"code", "code-insiders"}
 	default:
 		return []string{id}
 	}

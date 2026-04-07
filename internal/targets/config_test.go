@@ -16,10 +16,10 @@ func TestLoadReturnsBuiltInsWhenNoConfigExists(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if len(items) != 8 {
-		t.Fatalf("len(items) = %d, want 8", len(items))
+	if len(items) != 9 {
+		t.Fatalf("len(items) = %d, want 9", len(items))
 	}
-	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "windsurf") {
+	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "windsurf") || !containsID(items, "vscode") {
 		t.Fatalf("items missing expected built-ins: %+v", items)
 	}
 

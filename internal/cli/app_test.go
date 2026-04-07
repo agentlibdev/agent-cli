@@ -451,6 +451,96 @@ func TestRunEnableUsesBuiltInOpenCodeWithoutCustomConfig(t *testing.T) {
 	}
 }
 
+func TestRunEnableUsesBuiltInCursorWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "cursor", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".cursor", "skills", "raul", "code-reviewer", "0.4.0")
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		t.Fatalf("Lstat returned error: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("mode = %v, want symlink", info.Mode())
+	}
+}
+
+func TestRunEnableUsesBuiltInAntigravityWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "antigravity", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".gemini", "antigravity", "skills", "raul", "code-reviewer", "0.4.0")
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		t.Fatalf("Lstat returned error: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("mode = %v, want symlink", info.Mode())
+	}
+}
+
+func TestRunEnableUsesBuiltInVSCodeWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "vscode", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".vscode", "agentlib", "skills", "raul", "code-reviewer", "0.4.0")
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		t.Fatalf("Lstat returned error: %v", err)
+	}
+	if info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("mode = %v, want symlink", info.Mode())
+	}
+}
+
 func (client fakeRegistryClient) FetchVersion(context.Context, agentref.Ref) (registry.Version, error) {
 	return registry.Version{
 		Namespace: "raul",

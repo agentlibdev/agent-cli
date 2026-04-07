@@ -90,6 +90,7 @@ The CLI has built-in target definitions for:
 - `gemini-cli`
 - `github-copilot`
 - `opencode`
+- `vscode`
 - `windsurf`
 
 List the currently known targets with:
@@ -116,6 +117,9 @@ Built-in targets resolve their default skill directory from `HOME`. For example:
 - `claude-code` -> `~/.claude/skills`
 - `cursor` -> `~/.cursor/skills`
 - `gemini-cli` -> `~/.gemini/skills`
+- `antigravity` -> `~/.gemini/antigravity/skills`
+- `opencode` -> `~/.config/opencode/skills`
+- `vscode` -> `~/.vscode/agentlib/skills`
 
 Enable an already installed package into a configured target with:
 
@@ -141,6 +145,9 @@ These built-ins are also ready to use without custom config:
 agentlib enable --target gemini raul/code-reviewer@0.4.0
 agentlib enable --target opencode raul/code-reviewer@0.4.0
 agentlib enable --target claude raul/code-reviewer@0.4.0
+agentlib enable --target cursor raul/code-reviewer@0.4.0
+agentlib enable --target antigravity raul/code-reviewer@0.4.0
+agentlib enable --target vscode raul/code-reviewer@0.4.0
 ```
 
 `enable` reads the package from the AgentLib store:

@@ -141,6 +141,16 @@ func builtIns(home string) []Target {
 			Mode:         "symlink",
 			Enabled:      true,
 		},
+		{
+			ID:           "vscode",
+			Name:         "VS Code",
+			Type:         TypeBuiltIn,
+			Format:       "vscode",
+			RelativePath: ".vscode/agentlib/skills",
+			InstallRoot:  filepath.Join(home, ".vscode", "agentlib", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
 	}
 }
 
