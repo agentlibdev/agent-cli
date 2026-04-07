@@ -135,6 +135,14 @@ Some built-ins also accept short aliases:
 - `gemini` -> `gemini-cli`
 - `copilot` -> `github-copilot`
 
+These built-ins are also ready to use without custom config:
+
+```bash
+agentlib enable --target gemini raul/code-reviewer@0.4.0
+agentlib enable --target opencode raul/code-reviewer@0.4.0
+agentlib enable --target claude raul/code-reviewer@0.4.0
+```
+
 `enable` reads the package from the AgentLib store:
 
 - global by default: `~/.agentlib/agents/...`
