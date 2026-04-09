@@ -1,6 +1,7 @@
 package targets
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,6 +76,68 @@ func TestEnableTargetCopiesPackageIntoInstallRoot(t *testing.T) {
 	}
 	if string(content) != "hello\n" {
 		t.Fatalf("content = %q", string(content))
+	}
+}
+
+func TestEnableBuiltInOpenClawGeneratesPackageExport(t *testing.T) {
+	store := t.TempDir()
+	ref := mustRef(t, "raul/code-reviewer@0.4.0")
+	sourceRoot := filepath.Join(store, "agents", ref.Namespace, ref.Name, ref.Version)
+	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	home := t.TempDir()
+	target := Target{
+		ID:          "openclaw",
+		Type:        TypeBuiltIn,
+		Format:      "package-export",
+		InstallRoot: filepath.Join(home, ".openclaw", "agents"),
+		Mode:        "generate",
+		Enabled:     true,
+	}
+
+	result, err := Enable(store, target, ref)
+	if err != nil {
+		t.Fatalf("Enable returned error: %v", err)
+	}
+	if result.Path != filepath.Join(home, ".openclaw", "agents", "raul", "code-reviewer", "0.4.0") {
+		t.Fatalf("Path = %q", result.Path)
+	}
+
+	content, err := os.ReadFile(filepath.Join(result.Path, "README.md"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Fatalf("README.md = %q", string(content))
+	}
+
+	metaContent, err := os.ReadFile(filepath.Join(result.Path, "agentlib-export.json"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var meta struct {
+		TargetID        string `json:"targetId"`
+		SourceRef       string `json:"sourceRef"`
+		SourceStorePath string `json:"sourceStorePath"`
+		ExportedAt      string `json:"exportedAt"`
+		FormatVersion   int    `json:"formatVersion"`
+	}
+	if err := json.Unmarshal(metaContent, &meta); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if meta.TargetID != "openclaw" || meta.SourceRef != "raul/code-reviewer@0.4.0" || meta.SourceStorePath != sourceRoot {
+		t.Fatalf("metadata = %+v", meta)
+	}
+	if meta.ExportedAt == "" {
+		t.Fatal("ExportedAt is empty")
+	}
+	if meta.FormatVersion != 1 {
+		t.Fatalf("FormatVersion = %d, want 1", meta.FormatVersion)
 	}
 }
 

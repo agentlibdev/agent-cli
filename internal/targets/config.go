@@ -102,6 +102,16 @@ func builtIns(home string) []Target {
 			Enabled:      true,
 		},
 		{
+			ID:           "openclaw",
+			Name:         "OpenClaw",
+			Type:         TypeBuiltIn,
+			Format:       "package-export",
+			RelativePath: ".openclaw/agents",
+			InstallRoot:  filepath.Join(home, ".openclaw", "agents"),
+			Mode:         "generate",
+			Enabled:      true,
+		},
+		{
 			ID:           "gemini-cli",
 			Name:         "Gemini CLI",
 			Type:         TypeBuiltIn,

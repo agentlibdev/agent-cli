@@ -16,16 +16,27 @@ func TestLoadReturnsBuiltInsWhenNoConfigExists(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if len(items) != 9 {
-		t.Fatalf("len(items) = %d, want 9", len(items))
+	if len(items) != 10 {
+		t.Fatalf("len(items) = %d, want 10", len(items))
 	}
-	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "windsurf") || !containsID(items, "vscode") {
+	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "openclaw") || !containsID(items, "windsurf") || !containsID(items, "vscode") {
 		t.Fatalf("items missing expected built-ins: %+v", items)
 	}
 
 	codex := findByID(items, "codex")
 	if codex.InstallRoot != filepath.Join(home, ".agents", "skills") {
 		t.Fatalf("codex.InstallRoot = %q", codex.InstallRoot)
+	}
+
+	openclaw := findByID(items, "openclaw")
+	if openclaw.InstallRoot != filepath.Join(home, ".openclaw", "agents") {
+		t.Fatalf("openclaw.InstallRoot = %q", openclaw.InstallRoot)
+	}
+	if openclaw.Format != "package-export" {
+		t.Fatalf("openclaw.Format = %q", openclaw.Format)
+	}
+	if openclaw.Mode != "generate" {
+		t.Fatalf("openclaw.Mode = %q", openclaw.Mode)
 	}
 }
 

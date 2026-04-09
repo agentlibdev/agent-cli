@@ -89,6 +89,7 @@ The CLI has built-in target definitions for:
 - `codex`
 - `gemini-cli`
 - `github-copilot`
+- `openclaw`
 - `opencode`
 - `vscode`
 - `windsurf`
@@ -118,6 +119,7 @@ Built-in targets resolve their default skill directory from `HOME`. For example:
 - `cursor` -> `~/.cursor/skills`
 - `gemini-cli` -> `~/.gemini/skills`
 - `antigravity` -> `~/.gemini/antigravity/skills`
+- `openclaw` -> `~/.openclaw/agents`
 - `opencode` -> `~/.config/opencode/skills`
 - `vscode` -> `~/.vscode/agentlib/skills`
 
@@ -131,6 +133,12 @@ Codex is the first built-in target that works without any custom `targets.json` 
 
 ```bash
 agentlib enable --target codex raul/code-reviewer@0.4.0
+```
+
+OpenClaw is the first built-in target that uses generated package export without custom config:
+
+```bash
+agentlib enable --target openclaw raul/code-reviewer@0.4.0
 ```
 
 Some built-ins also accept short aliases:
@@ -159,8 +167,9 @@ and materializes it into the target `installRoot` using the target mode:
 
 - `symlink`
 - `copy`
+- `generate` for package-export targets such as `openclaw`
 
-`generate` is reserved for future adapter-specific emitters.
+OpenClaw exports the canonical package into `~/.openclaw/agents/<namespace>/<name>/<version>/` and writes `agentlib-export.json` alongside the package files.
 
 The CLI can also load custom target definitions from:
 

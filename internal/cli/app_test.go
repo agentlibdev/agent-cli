@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -340,6 +341,67 @@ func TestRunEnableUsesBuiltInCodexWithoutCustomConfig(t *testing.T) {
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("mode = %v, want symlink", info.Mode())
+	}
+}
+
+func TestRunEnableUsesBuiltInOpenClawWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "agent.yaml"), []byte("name: code-reviewer\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "openclaw", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".openclaw", "agents", "raul", "code-reviewer", "0.4.0")
+	if got := stdout.String(); !strings.Contains(got, "enabled: raul/code-reviewer@0.4.0 -> openclaw") {
+		t.Fatalf("stdout = %q", got)
+	}
+	content, err := os.ReadFile(filepath.Join(targetPath, "README.md"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Fatalf("README.md = %q", string(content))
+	}
+
+	metaPath := filepath.Join(targetPath, "agentlib-export.json")
+	metaContent, err := os.ReadFile(metaPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var meta struct {
+		TargetID        string `json:"targetId"`
+		SourceRef       string `json:"sourceRef"`
+		SourceStorePath string `json:"sourceStorePath"`
+		ExportedAt      string `json:"exportedAt"`
+		FormatVersion   int    `json:"formatVersion"`
+	}
+	if err := json.Unmarshal(metaContent, &meta); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if meta.TargetID != "openclaw" || meta.SourceRef != ref || meta.SourceStorePath != storePath {
+		t.Fatalf("metadata = %+v", meta)
+	}
+	if meta.ExportedAt == "" {
+		t.Fatal("ExportedAt is empty")
+	}
+	if meta.FormatVersion != 1 {
+		t.Fatalf("FormatVersion = %d, want 1", meta.FormatVersion)
 	}
 }
 

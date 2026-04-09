@@ -1,14 +1,18 @@
 package targets
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/agentlibdev/agent-cli/internal/agentref"
 )
+
+const packageExportFormatVersion = 1
 
 type EnableResult struct {
 	Path string
@@ -42,6 +46,16 @@ func Enable(storeRoot string, target Target, ref agentref.Ref) (EnableResult, er
 		}
 	case "symlink", "":
 		if err := os.Symlink(sourceRoot, targetPath); err != nil {
+			return EnableResult{}, err
+		}
+	case "generate":
+		if target.Format != "package-export" {
+			return EnableResult{}, fmt.Errorf("target %s uses unsupported format %q for mode %q", target.ID, target.Format, target.Mode)
+		}
+		if err := copyDir(sourceRoot, targetPath); err != nil {
+			return EnableResult{}, err
+		}
+		if err := writePackageExportMetadata(targetPath, target.ID, ref, sourceRoot); err != nil {
 			return EnableResult{}, err
 		}
 	default:
@@ -92,4 +106,27 @@ func copyDir(sourceRoot, targetRoot string) error {
 
 		return nil
 	})
+}
+
+type packageExportMetadata struct {
+	TargetID        string `json:"targetId"`
+	SourceRef       string `json:"sourceRef"`
+	SourceStorePath string `json:"sourceStorePath"`
+	ExportedAt      string `json:"exportedAt"`
+	FormatVersion   int    `json:"formatVersion"`
+}
+
+func writePackageExportMetadata(targetPath, targetID string, ref agentref.Ref, sourceStorePath string) error {
+	content, err := json.MarshalIndent(packageExportMetadata{
+		TargetID:        targetID,
+		SourceRef:       fmt.Sprintf("%s/%s@%s", ref.Namespace, ref.Name, ref.Version),
+		SourceStorePath: sourceStorePath,
+		ExportedAt:      time.Now().UTC().Format(time.RFC3339Nano),
+		FormatVersion:   packageExportFormatVersion,
+	}, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(targetPath, "agentlib-export.json"), append(content, '\n'), 0o644)
 }
