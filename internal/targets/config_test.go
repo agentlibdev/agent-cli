@@ -16,10 +16,10 @@ func TestLoadReturnsBuiltInsWhenNoConfigExists(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	if len(items) != 10 {
-		t.Fatalf("len(items) = %d, want 10", len(items))
+	if len(items) != 12 {
+		t.Fatalf("len(items) = %d, want 12", len(items))
 	}
-	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "openclaw") || !containsID(items, "windsurf") || !containsID(items, "vscode") {
+	if !containsID(items, "antigravity") || !containsID(items, "codex") || !containsID(items, "crewai") || !containsID(items, "langchain") || !containsID(items, "openclaw") || !containsID(items, "windsurf") || !containsID(items, "vscode") {
 		t.Fatalf("items missing expected built-ins: %+v", items)
 	}
 
@@ -37,6 +37,28 @@ func TestLoadReturnsBuiltInsWhenNoConfigExists(t *testing.T) {
 	}
 	if openclaw.Mode != "generate" {
 		t.Fatalf("openclaw.Mode = %q", openclaw.Mode)
+	}
+
+	crewai := findByID(items, "crewai")
+	if crewai.InstallRoot != filepath.Join(home, ".crewai", "agents") {
+		t.Fatalf("crewai.InstallRoot = %q", crewai.InstallRoot)
+	}
+	if crewai.Format != "package-export" {
+		t.Fatalf("crewai.Format = %q", crewai.Format)
+	}
+	if crewai.Mode != "generate" {
+		t.Fatalf("crewai.Mode = %q", crewai.Mode)
+	}
+
+	langchain := findByID(items, "langchain")
+	if langchain.InstallRoot != filepath.Join(home, ".langchain", "agents") {
+		t.Fatalf("langchain.InstallRoot = %q", langchain.InstallRoot)
+	}
+	if langchain.Format != "package-export" {
+		t.Fatalf("langchain.Format = %q", langchain.Format)
+	}
+	if langchain.Mode != "generate" {
+		t.Fatalf("langchain.Mode = %q", langchain.Mode)
 	}
 }
 

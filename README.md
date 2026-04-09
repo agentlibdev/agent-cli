@@ -85,10 +85,12 @@ The CLI has built-in target definitions for:
 
 - `antigravity`
 - `claude-code`
+- `crewai`
 - `cursor`
 - `codex`
 - `gemini-cli`
 - `github-copilot`
+- `langchain`
 - `openclaw`
 - `opencode`
 - `vscode`
@@ -119,6 +121,8 @@ Built-in targets resolve their default skill directory from `HOME`. For example:
 - `cursor` -> `~/.cursor/skills`
 - `gemini-cli` -> `~/.gemini/skills`
 - `antigravity` -> `~/.gemini/antigravity/skills`
+- `crewai` -> `~/.crewai/agents`
+- `langchain` -> `~/.langchain/agents`
 - `openclaw` -> `~/.openclaw/agents`
 - `opencode` -> `~/.config/opencode/skills`
 - `vscode` -> `~/.vscode/agentlib/skills`
@@ -169,7 +173,11 @@ and materializes it into the target `installRoot` using the target mode:
 - `copy`
 - `generate` for package-export targets such as `openclaw`
 
-OpenClaw exports the canonical package into `~/.openclaw/agents/<namespace>/<name>/<version>/` and writes `agentlib-export.json` alongside the package files.
+Generated package-export targets currently include:
+
+- `openclaw`: exports into `~/.openclaw/agents/<namespace>/<name>/<version>/` and writes `agentlib-export.json`
+- `crewai`: exports into `~/.crewai/agents/<namespace>/<name>/<version>/` and writes `agentlib-export.json` plus `crewai-agent.py`
+- `langchain`: exports into `~/.langchain/agents/<namespace>/<name>/<version>/` and writes `agentlib-export.json` plus `langchain-agent.py`
 
 The CLI can also load custom target definitions from:
 

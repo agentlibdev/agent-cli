@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/agentlibdev/agent-cli/internal/agentref"
@@ -138,6 +139,94 @@ func TestEnableBuiltInOpenClawGeneratesPackageExport(t *testing.T) {
 	}
 	if meta.FormatVersion != 1 {
 		t.Fatalf("FormatVersion = %d, want 1", meta.FormatVersion)
+	}
+}
+
+func TestEnableBuiltInCrewAIGeneratesPackageExportAndStarterFile(t *testing.T) {
+	store := t.TempDir()
+	ref := mustRef(t, "raul/code-reviewer@0.4.0")
+	sourceRoot := filepath.Join(store, "agents", ref.Namespace, ref.Name, ref.Version)
+	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	home := t.TempDir()
+	target := Target{
+		ID:          "crewai",
+		Type:        TypeBuiltIn,
+		Format:      "package-export",
+		InstallRoot: filepath.Join(home, ".crewai", "agents"),
+		Mode:        "generate",
+		Enabled:     true,
+	}
+
+	result, err := Enable(store, target, ref)
+	if err != nil {
+		t.Fatalf("Enable returned error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(result.Path, "README.md"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Fatalf("README.md = %q", string(content))
+	}
+
+	starterContent, err := os.ReadFile(filepath.Join(result.Path, "crewai-agent.py"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	starter := string(starterContent)
+	if !strings.Contains(starter, "raul/code-reviewer@0.4.0") || !strings.Contains(starter, "AgentLib CrewAI export") {
+		t.Fatalf("starter = %q", starter)
+	}
+}
+
+func TestEnableBuiltInLangChainGeneratesPackageExportAndStarterFile(t *testing.T) {
+	store := t.TempDir()
+	ref := mustRef(t, "raul/code-reviewer@0.4.0")
+	sourceRoot := filepath.Join(store, "agents", ref.Namespace, ref.Name, ref.Version)
+	if err := os.MkdirAll(sourceRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceRoot, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	home := t.TempDir()
+	target := Target{
+		ID:          "langchain",
+		Type:        TypeBuiltIn,
+		Format:      "package-export",
+		InstallRoot: filepath.Join(home, ".langchain", "agents"),
+		Mode:        "generate",
+		Enabled:     true,
+	}
+
+	result, err := Enable(store, target, ref)
+	if err != nil {
+		t.Fatalf("Enable returned error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(result.Path, "README.md"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(content) != "hello\n" {
+		t.Fatalf("README.md = %q", string(content))
+	}
+
+	starterContent, err := os.ReadFile(filepath.Join(result.Path, "langchain-agent.py"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	starter := string(starterContent)
+	if !strings.Contains(starter, "raul/code-reviewer@0.4.0") || !strings.Contains(starter, "AgentLib LangChain export") {
+		t.Fatalf("starter = %q", starter)
 	}
 }
 

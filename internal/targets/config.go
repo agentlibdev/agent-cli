@@ -92,6 +92,16 @@ func builtIns(home string) []Target {
 			Enabled:      true,
 		},
 		{
+			ID:           "crewai",
+			Name:         "CrewAI",
+			Type:         TypeBuiltIn,
+			Format:       "package-export",
+			RelativePath: ".crewai/agents",
+			InstallRoot:  filepath.Join(home, ".crewai", "agents"),
+			Mode:         "generate",
+			Enabled:      true,
+		},
+		{
 			ID:           "codex",
 			Name:         "Codex",
 			Type:         TypeBuiltIn,
@@ -129,6 +139,16 @@ func builtIns(home string) []Target {
 			RelativePath: ".copilot/skills",
 			InstallRoot:  filepath.Join(home, ".copilot", "skills"),
 			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
+			ID:           "langchain",
+			Name:         "LangChain",
+			Type:         TypeBuiltIn,
+			Format:       "package-export",
+			RelativePath: ".langchain/agents",
+			InstallRoot:  filepath.Join(home, ".langchain", "agents"),
+			Mode:         "generate",
 			Enabled:      true,
 		},
 		{

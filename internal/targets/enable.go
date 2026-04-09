@@ -58,6 +58,9 @@ func Enable(storeRoot string, target Target, ref agentref.Ref) (EnableResult, er
 		if err := writePackageExportMetadata(targetPath, target.ID, ref, sourceRoot); err != nil {
 			return EnableResult{}, err
 		}
+		if err := writeGeneratedStarter(targetPath, target.ID, ref); err != nil {
+			return EnableResult{}, err
+		}
 	default:
 		return EnableResult{}, fmt.Errorf("target %s uses unsupported mode %q", target.ID, target.Mode)
 	}
@@ -129,4 +132,29 @@ func writePackageExportMetadata(targetPath, targetID string, ref agentref.Ref, s
 	}
 
 	return os.WriteFile(filepath.Join(targetPath, "agentlib-export.json"), append(content, '\n'), 0o644)
+}
+
+func writeGeneratedStarter(targetPath, targetID string, ref agentref.Ref) error {
+	sourceRef := fmt.Sprintf("%s/%s@%s", ref.Namespace, ref.Name, ref.Version)
+
+	switch targetID {
+	case "crewai":
+		content := fmt.Sprintf(
+			"# AgentLib CrewAI export for %s\n# Generated from %s\n\nPACKAGE_DIR = %q\n",
+			sourceRef,
+			sourceRef,
+			targetPath,
+		)
+		return os.WriteFile(filepath.Join(targetPath, "crewai-agent.py"), []byte(content), 0o644)
+	case "langchain":
+		content := fmt.Sprintf(
+			"# AgentLib LangChain export for %s\n# Generated from %s\n\nPACKAGE_DIR = %q\n",
+			sourceRef,
+			sourceRef,
+			targetPath,
+		)
+		return os.WriteFile(filepath.Join(targetPath, "langchain-agent.py"), []byte(content), 0o644)
+	default:
+		return nil
+	}
 }

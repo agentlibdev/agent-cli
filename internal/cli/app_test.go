@@ -405,6 +405,66 @@ func TestRunEnableUsesBuiltInOpenClawWithoutCustomConfig(t *testing.T) {
 	}
 }
 
+func TestRunEnableUsesBuiltInCrewAIWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "crewai", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".crewai", "agents", "raul", "code-reviewer", "0.4.0")
+	starterContent, err := os.ReadFile(filepath.Join(targetPath, "crewai-agent.py"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if got := string(starterContent); !strings.Contains(got, "raul/code-reviewer@0.4.0") {
+		t.Fatalf("starter = %q", got)
+	}
+}
+
+func TestRunEnableUsesBuiltInLangChainWithoutCustomConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"enable", "--target", "langchain", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".langchain", "agents", "raul", "code-reviewer", "0.4.0")
+	starterContent, err := os.ReadFile(filepath.Join(targetPath, "langchain-agent.py"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if got := string(starterContent); !strings.Contains(got, "raul/code-reviewer@0.4.0") {
+		t.Fatalf("starter = %q", got)
+	}
+}
+
 func TestRunEnableResolvesClaudeAliasToBuiltInTarget(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
