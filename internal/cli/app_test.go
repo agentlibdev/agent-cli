@@ -530,6 +530,40 @@ func TestRunEnableUsesGlobalStoreAndConfiguredTarget(t *testing.T) {
 	}
 }
 
+func TestRunActivateUsesGlobalStoreAndConfiguredTarget(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	targetDir := filepath.Join(t.TempDir(), "target-skills")
+	cli := app{
+		loadTargets: func(string) ([]targets.Target, error) {
+			return []targets.Target{
+				{ID: "codex-local", Type: targets.TypeCustom, Format: "markdown-skill-dir", InstallRoot: targetDir, Mode: "symlink", Enabled: true},
+			}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"activate", ref, "--target", "codex-local"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "activated: raul/code-reviewer@0.4.0 -> codex-local") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
 func TestRunEnableUsesBuiltInCodexWithoutCustomConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

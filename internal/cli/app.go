@@ -63,7 +63,9 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	case "targets":
 		return a.runTargets(args[1:], stdout, stderr)
 	case "enable":
-		return a.runEnable(args[1:], stdout, stderr)
+		return a.runEnableLike("enable", args[1:], stdout, stderr)
+	case "activate":
+		return a.runEnableLike("activate", args[1:], stdout, stderr)
 	case "deactivate":
 		return a.runDeactivate(args[1:], stdout, stderr)
 	case "search":
@@ -291,10 +293,10 @@ func runRemove(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-func (a app) runEnable(args []string, stdout, stderr io.Writer) int {
+func (a app) runEnableLike(command string, args []string, stdout, stderr io.Writer) int {
 	local, global, installDir, targetID, refValue, err := parseEnableArgs(args)
 	if err != nil {
-		fmt.Fprintln(stderr, "usage: agentlib enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
+		fmt.Fprintf(stderr, "usage: agentlib %s [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>\n", command)
 		return 1
 	}
 
@@ -348,7 +350,7 @@ func (a app) runEnable(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "enabled: %s/%s@%s -> %s\n", ref.Namespace, ref.Name, ref.Version, selected.ID)
+	fmt.Fprintf(stdout, "%sd: %s/%s@%s -> %s\n", command, ref.Namespace, ref.Name, ref.Version, selected.ID)
 	fmt.Fprintf(stdout, "path: %s\n", result.Path)
 	return 0
 }
@@ -519,6 +521,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
 	fmt.Fprintln(writer, "  targets list")
 	fmt.Fprintln(writer, "  targets detect")
+	fmt.Fprintln(writer, "  activate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  deactivate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] [--runtime <id>] [--all-detected] [--no-activate] <namespace/name@version>")
