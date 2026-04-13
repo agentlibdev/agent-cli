@@ -12,6 +12,28 @@ services:
       GOCACHE: /root/.cache/go-build
     command: sh -c "go test ./... && go build ./cmd/agentlib"
 
+  go-dist:
+    build:
+      context: .
+      dockerfile: Dockerfile.go-build
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+    environment:
+      GOCACHE: /root/.cache/go-build
+    command: >-
+      sh -c "
+      rm -rf dist &&
+      mkdir -p dist &&
+      go test ./... &&
+      GOOS=linux GOARCH=amd64 go build -o dist/agentlib-linux-amd64 ./cmd/agentlib &&
+      GOOS=linux GOARCH=arm64 go build -o dist/agentlib-linux-arm64 ./cmd/agentlib &&
+      GOOS=windows GOARCH=amd64 go build -o dist/agentlib-windows-amd64.exe ./cmd/agentlib &&
+      GOOS=windows GOARCH=arm64 go build -o dist/agentlib-windows-arm64.exe ./cmd/agentlib
+      "
+
 volumes:
   go-mod-cache:
   go-build-cache:

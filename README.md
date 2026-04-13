@@ -79,6 +79,25 @@ agentlib install --local --install-dir vendor/agentlib raul/code-reviewer@0.4.0
 
 `--install-dir` requires `--local`. Use `--global` or `-g` to be explicit about the default global mode.
 
+After a successful install, the CLI can also activate the package into detected runtimes.
+
+Default behavior:
+
+- if the process is interactive and compatible runtimes are detected, `install` shows a multiselect prompt
+- if the process is non-interactive, `install` only installs unless you pass activation flags explicitly
+
+Examples:
+
+```bash
+agentlib install raul/code-reviewer@0.4.0
+agentlib install --runtime codex raul/code-reviewer@0.4.0
+agentlib install --runtime codex --runtime claude raul/code-reviewer@0.4.0
+agentlib install --all-detected raul/code-reviewer@0.4.0
+agentlib install --no-activate raul/code-reviewer@0.4.0
+```
+
+Activation during install currently reuses the same target materialization path as `enable`.
+
 ## Target adapters
 
 The CLI has built-in target definitions for:
@@ -222,6 +241,22 @@ docker compose run --rm go-build
 ```
 
 That command runs `go test ./...` and `go build ./cmd/agentlib` inside the container while reusing Docker volumes for the Go module and build caches.
+
+To build distributable test binaries into `dist/`:
+
+```bash
+docker compose run --rm go-dist
+```
+
+That command:
+
+- runs `go test ./...`
+- writes `dist/agentlib-linux-amd64`
+- writes `dist/agentlib-linux-arm64`
+- writes `dist/agentlib-windows-amd64.exe`
+- writes `dist/agentlib-windows-arm64.exe`
+
+For WSL, use the Linux binary. WSL does not need a separate build target.
 
 ## Release packaging
 

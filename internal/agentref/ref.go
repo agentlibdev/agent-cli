@@ -11,6 +11,10 @@ type Ref struct {
 	Version   string
 }
 
+func (ref Ref) String() string {
+	return fmt.Sprintf("%s/%s@%s", ref.Namespace, ref.Name, ref.Version)
+}
+
 func Parse(value string) (Ref, error) {
 	versionParts := strings.Split(value, "@")
 	if len(versionParts) != 2 || versionParts[0] == "" || versionParts[1] == "" {

@@ -24,9 +24,12 @@ type registryClient interface {
 }
 
 type app struct {
-	newRegistryClient func(baseURL string) registryClient
-	loadTargets       func(projectDir string) ([]targets.Target, error)
-	detectTargets     func(projectDir string) ([]targets.Detection, error)
+	newRegistryClient  func(baseURL string) registryClient
+	loadTargets        func(projectDir string) ([]targets.Target, error)
+	detectTargets      func(projectDir string) ([]targets.Detection, error)
+	enableTarget       func(storeRoot string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error)
+	stdin              io.Reader
+	isInteractiveInput func() bool
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
@@ -34,8 +37,11 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		newRegistryClient: func(baseURL string) registryClient {
 			return registry.New(baseURL)
 		},
-		loadTargets:   targets.Load,
-		detectTargets: targets.Detect,
+		loadTargets:        targets.Load,
+		detectTargets:      targets.Detect,
+		enableTarget:       targets.Enable,
+		stdin:              os.Stdin,
+		isInteractiveInput: defaultInteractiveInput,
 	}.Run(ctx, args, stdout, stderr)
 }
 
@@ -180,12 +186,16 @@ func (a app) runInstall(ctx context.Context, args []string, stdout, stderr io.Wr
 	global := flags.Bool("global", false, "")
 	flags.BoolVar(global, "g", false, "")
 	installDir := flags.String("install-dir", "", "")
+	noActivate := flags.Bool("no-activate", false, "")
+	allDetected := flags.Bool("all-detected", false, "")
+	var runtimes stringListFlag
+	flags.Var(&runtimes, "runtime", "")
 	if err := flags.Parse(args); err != nil {
-		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] [--runtime <id>] [--all-detected] [--no-activate] <namespace/name@version>")
 		return 1
 	}
 	if flags.NArg() != 1 {
-		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		fmt.Fprintln(stderr, "usage: agentlib install [--local|--global|-g] [--install-dir <dir>] [--runtime <id>] [--all-detected] [--no-activate] <namespace/name@version>")
 		return 1
 	}
 
@@ -204,6 +214,33 @@ func (a app) runInstall(ctx context.Context, args []string, stdout, stderr io.Wr
 	result, err := install.Run(ctx, a.registryClient(), resolvedTarget.Root, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "install agent: %v\n", err)
+		return 1
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
+		return 1
+	}
+
+	stdin := a.stdin
+	if stdin == nil {
+		stdin = os.Stdin
+	}
+
+	if err := a.maybeActivateInstall(
+		resolvedTarget.Root,
+		workingDir,
+		ref,
+		installActivationOptions{
+			RuntimeIDs:  []string(runtimes),
+			AllDetected: *allDetected,
+			NoActivate:  *noActivate,
+		},
+		stdin,
+		stdout,
+	); err != nil {
+		fmt.Fprintf(stderr, "activate runtimes: %v\n", err)
 		return 1
 	}
 
@@ -292,7 +329,12 @@ func (a app) runEnable(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	result, err := targets.Enable(resolvedTarget.Root, selected, ref)
+	enableTarget := a.enableTarget
+	if enableTarget == nil {
+		enableTarget = targets.Enable
+	}
+
+	result, err := enableTarget(resolvedTarget.Root, selected, ref)
 	if err != nil {
 		fmt.Fprintf(stderr, "enable target: %v\n", err)
 		return 1
@@ -408,7 +450,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  targets list")
 	fmt.Fprintln(writer, "  targets detect")
 	fmt.Fprintln(writer, "  enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
-	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] [--runtime <id>] [--all-detected] [--no-activate] <namespace/name@version>")
 	fmt.Fprintln(writer, "  remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 }
 
@@ -511,4 +553,13 @@ func parseEnableArgs(args []string) (bool, bool, string, string, string, error) 
 	}
 
 	return local, global, installDir, targetID, refValue, nil
+}
+
+func defaultInteractiveInput() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	return (info.Mode() & os.ModeCharDevice) != 0
 }

@@ -211,6 +211,222 @@ func TestRunInstallLocalWithInstallDirUsesOverride(t *testing.T) {
 	}
 }
 
+func TestRunInstallPromptsForDetectedRuntimesAndActivatesSelectedTargets(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir returned error: %v", err)
+	}
+
+	enabled := make([]string, 0, 2)
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{}
+		},
+		stdin: strings.NewReader("1,2\n"),
+		isInteractiveInput: func() bool {
+			return true
+		},
+		detectTargets: func(string) ([]targets.Detection, error) {
+			return []targets.Detection{
+				{
+					Target:   targets.Target{ID: "codex", Name: "Codex", Type: targets.TypeBuiltIn, Format: "codex", Mode: "symlink", Enabled: true},
+					Detected: true,
+					Status:   "detected",
+				},
+				{
+					Target:   targets.Target{ID: "claude-code", Name: "Claude Code", Type: targets.TypeBuiltIn, Format: "claude-code", Mode: "symlink", Enabled: true},
+					Detected: true,
+					Status:   "detected",
+				},
+			}, nil
+		},
+		enableTarget: func(_ string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error) {
+			enabled = append(enabled, target.ID+":"+ref.String())
+			return targets.EnableResult{Path: "/tmp/" + target.ID}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"install", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	if len(enabled) != 2 {
+		t.Fatalf("len(enabled) = %d, want 2 (%v)", len(enabled), enabled)
+	}
+	if !strings.Contains(stdout.String(), "Select runtimes to activate") {
+		t.Fatalf("stdout = %q, want prompt", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "activated: codex") || !strings.Contains(stdout.String(), "activated: claude-code") {
+		t.Fatalf("stdout = %q, want activation summary", stdout.String())
+	}
+}
+
+func TestRunInstallNoActivateSkipsPromptAndActivation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir returned error: %v", err)
+	}
+
+	prompted := false
+	activated := false
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{}
+		},
+		stdin: strings.NewReader("1\n"),
+		isInteractiveInput: func() bool {
+			prompted = true
+			return true
+		},
+		detectTargets: func(string) ([]targets.Detection, error) {
+			t.Fatal("detectTargets should not be called with --no-activate")
+			return nil, nil
+		},
+		enableTarget: func(_ string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error) {
+			activated = true
+			return targets.EnableResult{}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"install", "--no-activate", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if activated {
+		t.Fatal("activation ran, want skipped")
+	}
+	if strings.Contains(stdout.String(), "Select runtimes to activate") {
+		t.Fatalf("stdout = %q, did not expect prompt", stdout.String())
+	}
+	if prompted {
+		t.Fatal("interactive detection should not run with --no-activate")
+	}
+}
+
+func TestRunInstallNonInteractiveSkipsPromptAndActivation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir returned error: %v", err)
+	}
+
+	activated := false
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{}
+		},
+		isInteractiveInput: func() bool {
+			return false
+		},
+		detectTargets: func(string) ([]targets.Detection, error) {
+			t.Fatal("detectTargets should not be called for non-interactive install without explicit runtime")
+			return nil, nil
+		},
+		enableTarget: func(_ string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error) {
+			activated = true
+			return targets.EnableResult{}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"install", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if activated {
+		t.Fatal("activation ran, want skipped")
+	}
+	if strings.Contains(stdout.String(), "Select runtimes to activate") {
+		t.Fatalf("stdout = %q, did not expect prompt", stdout.String())
+	}
+}
+
+func TestRunInstallExplicitRuntimeActivatesWithoutPrompt(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir returned error: %v", err)
+	}
+
+	activated := ""
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{}
+		},
+		isInteractiveInput: func() bool {
+			t.Fatal("interactive detection should not run for explicit runtime")
+			return false
+		},
+		loadTargets: func(string) ([]targets.Target, error) {
+			return []targets.Target{
+				{ID: "codex", Name: "Codex", Type: targets.TypeBuiltIn, Format: "codex", Mode: "symlink", Enabled: true},
+				{ID: "claude-code", Name: "Claude Code", Type: targets.TypeBuiltIn, Format: "claude-code", Mode: "symlink", Enabled: true},
+			}, nil
+		},
+		enableTarget: func(_ string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error) {
+			activated = target.ID
+			return targets.EnableResult{Path: "/tmp/" + target.ID}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"install", "--runtime", "codex", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if activated != "codex" {
+		t.Fatalf("activated = %q, want codex", activated)
+	}
+	if strings.Contains(stdout.String(), "Select runtimes to activate") {
+		t.Fatalf("stdout = %q, did not expect prompt", stdout.String())
+	}
+}
+
 type fakeRegistryClient struct {
 	agents []registry.AgentSummary
 }
