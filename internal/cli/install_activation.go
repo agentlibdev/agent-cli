@@ -63,6 +63,9 @@ func (a app) maybeActivateInstall(
 		if err != nil {
 			return fmt.Errorf("activate %s: %w", target.ID, err)
 		}
+		if err := targets.UpsertActivation(storeRoot, target.ID, ref, result.Path); err != nil {
+			return fmt.Errorf("persist activation %s: %w", target.ID, err)
+		}
 
 		fmt.Fprintf(stdout, "activated: %s\n", target.ID)
 		fmt.Fprintf(stdout, "path: %s\n", result.Path)

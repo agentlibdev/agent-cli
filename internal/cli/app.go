@@ -28,6 +28,7 @@ type app struct {
 	loadTargets        func(projectDir string) ([]targets.Target, error)
 	detectTargets      func(projectDir string) ([]targets.Detection, error)
 	enableTarget       func(storeRoot string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error)
+	disableTarget      func(target targets.Target, ref agentref.Ref) (targets.DisableResult, error)
 	stdin              io.Reader
 	isInteractiveInput func() bool
 }
@@ -40,6 +41,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		loadTargets:        targets.Load,
 		detectTargets:      targets.Detect,
 		enableTarget:       targets.Enable,
+		disableTarget:      targets.Disable,
 		stdin:              os.Stdin,
 		isInteractiveInput: defaultInteractiveInput,
 	}.Run(ctx, args, stdout, stderr)
@@ -62,6 +64,8 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return a.runTargets(args[1:], stdout, stderr)
 	case "enable":
 		return a.runEnable(args[1:], stdout, stderr)
+	case "deactivate":
+		return a.runDeactivate(args[1:], stdout, stderr)
 	case "search":
 		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
@@ -339,8 +343,74 @@ func (a app) runEnable(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "enable target: %v\n", err)
 		return 1
 	}
+	if err := targets.UpsertActivation(resolvedTarget.Root, selected.ID, ref, result.Path); err != nil {
+		fmt.Fprintf(stderr, "persist activation: %v\n", err)
+		return 1
+	}
 
 	fmt.Fprintf(stdout, "enabled: %s/%s@%s -> %s\n", ref.Namespace, ref.Name, ref.Version, selected.ID)
+	fmt.Fprintf(stdout, "path: %s\n", result.Path)
+	return 0
+}
+
+func (a app) runDeactivate(args []string, stdout, stderr io.Writer) int {
+	local, global, installDir, targetID, refValue, err := parseEnableArgs(args)
+	if err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib deactivate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
+		return 1
+	}
+
+	resolvedTarget, err := resolveInstallTarget(local, global, installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	ref, err := agentref.Parse(refValue)
+	if err != nil {
+		fmt.Fprintf(stderr, "parse ref: %v\n", err)
+		return 1
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve working directory: %v\n", err)
+		return 1
+	}
+
+	loadTargets := a.loadTargets
+	if loadTargets == nil {
+		loadTargets = targets.Load
+	}
+
+	items, err := loadTargets(workingDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "load targets: %v\n", err)
+		return 1
+	}
+
+	selected, ok := findTarget(items, targetID)
+	if !ok {
+		fmt.Fprintf(stderr, "target %q not found\n", targetID)
+		return 1
+	}
+
+	disableTarget := a.disableTarget
+	if disableTarget == nil {
+		disableTarget = targets.Disable
+	}
+
+	result, err := disableTarget(selected, ref)
+	if err != nil {
+		fmt.Fprintf(stderr, "deactivate target: %v\n", err)
+		return 1
+	}
+	if err := targets.RemoveActivation(resolvedTarget.Root, selected.ID, ref); err != nil {
+		fmt.Fprintf(stderr, "persist activation removal: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "deactivated: %s/%s@%s -> %s\n", ref.Namespace, ref.Name, ref.Version, selected.ID)
 	fmt.Fprintf(stdout, "path: %s\n", result.Path)
 	return 0
 }
@@ -450,6 +520,7 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  targets list")
 	fmt.Fprintln(writer, "  targets detect")
 	fmt.Fprintln(writer, "  enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
+	fmt.Fprintln(writer, "  deactivate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  install [--local|--global|-g] [--install-dir <dir>] [--runtime <id>] [--all-detected] [--no-activate] <namespace/name@version>")
 	fmt.Fprintln(writer, "  remove [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 }

@@ -17,6 +17,7 @@ Current commands:
 - `agentlib search reviewer`
 - `agentlib show raul/code-reviewer@0.4.0`
 - `agentlib install raul/code-reviewer@0.4.0`
+- `agentlib deactivate --target codex raul/code-reviewer@0.4.0`
 - `agentlib remove raul/code-reviewer@0.4.0`
 
 ## Registry selection
@@ -98,6 +99,13 @@ agentlib install --no-activate raul/code-reviewer@0.4.0
 
 Activation during install currently reuses the same target materialization path as `enable`.
 
+Activation state is persisted in the selected AgentLib store root:
+
+- global: `~/.agentlib/config.json`
+- local: `<project>/.agentlib/config.json`
+
+Each activation record tracks the runtime target id, the package ref, the materialized path, and activation time.
+
 ## Target adapters
 
 The CLI has built-in target definitions for:
@@ -150,6 +158,12 @@ Enable an already installed package into a configured target with:
 
 ```bash
 agentlib enable --target openclaw-local raul/code-reviewer@0.4.0
+```
+
+Disable an activated package from a target with:
+
+```bash
+agentlib deactivate --target codex raul/code-reviewer@0.4.0
 ```
 
 Codex is the first built-in target that works without any custom `targets.json` entry:

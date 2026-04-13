@@ -558,6 +558,90 @@ func TestRunEnableUsesBuiltInCodexWithoutCustomConfig(t *testing.T) {
 	if info.Mode()&os.ModeSymlink == 0 {
 		t.Fatalf("mode = %v, want symlink", info.Mode())
 	}
+
+	configPath := filepath.Join(home, ".agentlib", "config.json")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var config struct {
+		Version     int `json:"version"`
+		Activations []struct {
+			TargetID string `json:"targetId"`
+			Ref      string `json:"ref"`
+			Path     string `json:"path"`
+		} `json:"activations"`
+	}
+	if err := json.Unmarshal(content, &config); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if config.Version != 1 {
+		t.Fatalf("config.Version = %d, want 1", config.Version)
+	}
+	if len(config.Activations) != 1 {
+		t.Fatalf("len(config.Activations) = %d, want 1", len(config.Activations))
+	}
+	if config.Activations[0].TargetID != "codex" || config.Activations[0].Ref != ref || config.Activations[0].Path != targetPath {
+		t.Fatalf("activation = %+v", config.Activations[0])
+	}
+}
+
+func TestRunDeactivateRemovesBuiltInCodexActivationAndState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(storePath, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	enableStdout := strings.Builder{}
+	enableStderr := strings.Builder{}
+	if exitCode := (app{}).Run(context.Background(), []string{"enable", "--target", "codex", ref}, &enableStdout, &enableStderr); exitCode != 0 {
+		t.Fatalf("enable exitCode = %d, stderr = %q", exitCode, enableStderr.String())
+	}
+
+	targetPath := filepath.Join(home, ".agents", "skills", "raul", "code-reviewer", "0.4.0")
+	if _, err := os.Lstat(targetPath); err != nil {
+		t.Fatalf("Lstat returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := app{}.Run(context.Background(), []string{"deactivate", "--target", "codex", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "deactivated: raul/code-reviewer@0.4.0 -> codex") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+	if _, err := os.Lstat(targetPath); !os.IsNotExist(err) {
+		t.Fatalf("target path still exists: %v", err)
+	}
+
+	configPath := filepath.Join(home, ".agentlib", "config.json")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var config struct {
+		Version     int `json:"version"`
+		Activations []struct {
+			TargetID string `json:"targetId"`
+			Ref      string `json:"ref"`
+			Path     string `json:"path"`
+		} `json:"activations"`
+	}
+	if err := json.Unmarshal(content, &config); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if len(config.Activations) != 0 {
+		t.Fatalf("len(config.Activations) = %d, want 0", len(config.Activations))
+	}
 }
 
 func TestRunEnableUsesBuiltInOpenClawWithoutCustomConfig(t *testing.T) {

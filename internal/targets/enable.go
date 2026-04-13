@@ -18,6 +18,10 @@ type EnableResult struct {
 	Path string
 }
 
+type DisableResult struct {
+	Path string
+}
+
 func Enable(storeRoot string, target Target, ref agentref.Ref) (EnableResult, error) {
 	if target.InstallRoot == "" {
 		return EnableResult{}, fmt.Errorf("target %s has no installRoot configured", target.ID)
@@ -66,6 +70,19 @@ func Enable(storeRoot string, target Target, ref agentref.Ref) (EnableResult, er
 	}
 
 	return EnableResult{Path: targetPath}, nil
+}
+
+func Disable(target Target, ref agentref.Ref) (DisableResult, error) {
+	if target.InstallRoot == "" {
+		return DisableResult{}, fmt.Errorf("target %s has no installRoot configured", target.ID)
+	}
+
+	targetPath := filepath.Join(target.InstallRoot, ref.Namespace, ref.Name, ref.Version)
+	if err := os.RemoveAll(targetPath); err != nil {
+		return DisableResult{}, err
+	}
+
+	return DisableResult{Path: targetPath}, nil
 }
 
 func copyDir(sourceRoot, targetRoot string) error {
