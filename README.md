@@ -116,6 +116,12 @@ Activation state is persisted in the selected AgentLib store root:
 
 Each activation record tracks the runtime target id, the package ref, the materialized path, and activation time.
 
+`remove` now removes more than the stored package contents:
+
+- deletes the installed package from the AgentLib store
+- removes persisted activation records for that package
+- removes the materialized runtime paths recorded for those activations
+
 Inspect one package with:
 
 ```bash

@@ -389,6 +389,18 @@ func runRemove(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	removedActivations, err := targets.RemoveActivationsForRef(resolvedTarget.Root, ref)
+	if err != nil {
+		fmt.Fprintf(stderr, "remove activations: %v\n", err)
+		return 1
+	}
+	for _, activation := range removedActivations {
+		if err := os.RemoveAll(activation.Path); err != nil {
+			fmt.Fprintf(stderr, "remove activation path: %v\n", err)
+			return 1
+		}
+	}
+
 	fmt.Fprintf(stdout, "removed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
 	return 0
 }

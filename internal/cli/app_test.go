@@ -57,6 +57,7 @@ func TestRunRemoveDeletesInstalledVersion(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
+	ref := "raul/code-reviewer@0.4.0"
 	installedPath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
 	if err := os.MkdirAll(installedPath, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
@@ -65,10 +66,17 @@ func TestRunRemoveDeletesInstalledVersion(t *testing.T) {
 	if err := os.WriteFile(lockfilePath, []byte("{\"version\":1,\"agent\":{\"namespace\":\"raul\",\"name\":\"code-reviewer\",\"version\":\"0.4.0\"}}\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
+	targetPath := filepath.Join(home, ".agents", "skills", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".agentlib", "config.json"), []byte("{\"version\":1,\"activations\":[{\"targetId\":\"codex\",\"ref\":\""+ref+"\",\"path\":\""+targetPath+"\",\"activatedAt\":\"2026-04-14T10:00:00Z\"}]}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
 
 	var stdout strings.Builder
 	var stderr strings.Builder
-	exitCode := app{}.Run(context.Background(), []string{"remove", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	exitCode := app{}.Run(context.Background(), []string{"remove", ref}, &stdout, &stderr)
 	if exitCode != 0 {
 		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
 	}
@@ -80,6 +88,28 @@ func TestRunRemoveDeletesInstalledVersion(t *testing.T) {
 	}
 	if _, err := os.Stat(lockfilePath); !os.IsNotExist(err) {
 		t.Fatalf("lockfile still exists: %v", err)
+	}
+	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
+		t.Fatalf("target path still exists: %v", err)
+	}
+
+	configPath := filepath.Join(home, ".agentlib", "config.json")
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	var config struct {
+		Version     int `json:"version"`
+		Activations []struct {
+			TargetID string `json:"targetId"`
+			Ref      string `json:"ref"`
+		} `json:"activations"`
+	}
+	if err := json.Unmarshal(content, &config); err != nil {
+		t.Fatalf("json.Unmarshal returned error: %v", err)
+	}
+	if len(config.Activations) != 0 {
+		t.Fatalf("len(config.Activations) = %d, want 0", len(config.Activations))
 	}
 }
 
