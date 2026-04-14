@@ -274,6 +274,81 @@ func TestRunInstallPromptsForDetectedRuntimesAndActivatesSelectedTargets(t *test
 	}
 }
 
+func TestRunInstallPromptFiltersDetectedRuntimesByVersionCompatibility(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	root := t.TempDir()
+	previousWorkingDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousWorkingDir)
+	})
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("Chdir returned error: %v", err)
+	}
+
+	enabled := make([]string, 0, 2)
+	cli := app{
+		newRegistryClient: func(string) registryClient {
+			return fakeRegistryClient{
+				version: registry.Version{
+					Namespace: "raul",
+					Name:      "code-reviewer",
+					Version:   "0.4.0",
+					Compatibility: registry.Compatibility{
+						Targets: []registry.TargetCompatibility{
+							{TargetID: "codex", BuiltFor: true},
+							{TargetID: "claude-code", BuiltFor: false, Tested: false, AdapterAvailable: false},
+						},
+					},
+				},
+			}
+		},
+		stdin: strings.NewReader("1\n"),
+		isInteractiveInput: func() bool {
+			return true
+		},
+		detectTargets: func(string) ([]targets.Detection, error) {
+			return []targets.Detection{
+				{
+					Target:   targets.Target{ID: "codex", Name: "Codex", Type: targets.TypeBuiltIn, Format: "codex", Mode: "symlink", Enabled: true},
+					Detected: true,
+					Status:   "detected",
+				},
+				{
+					Target:   targets.Target{ID: "claude-code", Name: "Claude Code", Type: targets.TypeBuiltIn, Format: "claude-code", Mode: "symlink", Enabled: true},
+					Detected: true,
+					Status:   "detected",
+				},
+			}, nil
+		},
+		enableTarget: func(_ string, target targets.Target, ref agentref.Ref) (targets.EnableResult, error) {
+			enabled = append(enabled, target.ID+":"+ref.String())
+			return targets.EnableResult{Path: "/tmp/" + target.ID}, nil
+		},
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := cli.Run(context.Background(), []string{"install", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+
+	if len(enabled) != 1 || enabled[0] != "codex:raul/code-reviewer@0.4.0" {
+		t.Fatalf("enabled = %v, want only codex", enabled)
+	}
+	if !strings.Contains(stdout.String(), "1. Codex (codex)") {
+		t.Fatalf("stdout = %q, want filtered codex prompt", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "Claude Code") {
+		t.Fatalf("stdout = %q, did not expect incompatible target in prompt", stdout.String())
+	}
+}
+
 func TestRunInstallNoActivateSkipsPromptAndActivation(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -428,7 +503,8 @@ func TestRunInstallExplicitRuntimeActivatesWithoutPrompt(t *testing.T) {
 }
 
 type fakeRegistryClient struct {
-	agents []registry.AgentSummary
+	agents  []registry.AgentSummary
+	version registry.Version
 }
 
 func TestRunTargetsListPrintsBuiltInsAndCustomTargets(t *testing.T) {
@@ -998,6 +1074,9 @@ func TestRunEnableUsesBuiltInVSCodeWithoutCustomConfig(t *testing.T) {
 }
 
 func (client fakeRegistryClient) FetchVersion(context.Context, agentref.Ref) (registry.Version, error) {
+	if client.version.Version != "" {
+		return client.version, nil
+	}
 	return registry.Version{
 		Namespace: "raul",
 		Name:      "code-reviewer",

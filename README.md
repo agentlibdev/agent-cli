@@ -87,6 +87,14 @@ Default behavior:
 - if the process is interactive and compatible runtimes are detected, `install` shows a multiselect prompt
 - if the process is non-interactive, `install` only installs unless you pass activation flags explicitly
 
+When the registry version payload includes compatibility metadata, the prompt and `--all-detected` activation path are filtered to detected runtimes that the package marks as:
+
+- `builtFor`
+- `tested`
+- `adapterAvailable`
+
+Explicit `--runtime <id>` still acts as a manual override.
+
 Examples:
 
 ```bash

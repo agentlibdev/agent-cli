@@ -2,12 +2,14 @@ package cli
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"strconv"
 	"strings"
 
 	"github.com/agentlibdev/agent-cli/internal/agentref"
+	"github.com/agentlibdev/agent-cli/internal/registry"
 	"github.com/agentlibdev/agent-cli/internal/targets"
 )
 
@@ -45,7 +47,12 @@ func (a app) maybeActivateInstall(
 		return nil
 	}
 
-	selectedTargets, err := a.selectInstallTargets(workingDir, options, stdin, stdout)
+	version, err := a.registryClient().FetchVersion(context.Background(), ref)
+	if err != nil {
+		return fmt.Errorf("fetch version compatibility: %w", err)
+	}
+
+	selectedTargets, err := a.selectInstallTargets(workingDir, version, options, stdin, stdout)
 	if err != nil {
 		return err
 	}
@@ -76,6 +83,7 @@ func (a app) maybeActivateInstall(
 
 func (a app) selectInstallTargets(
 	workingDir string,
+	version registry.Version,
 	options installActivationOptions,
 	stdin io.Reader,
 	stdout io.Writer,
@@ -85,7 +93,11 @@ func (a app) selectInstallTargets(
 	}
 
 	if options.AllDetected {
-		return a.detectedInstallTargets(workingDir)
+		items, err := a.detectedInstallTargets(workingDir)
+		if err != nil {
+			return nil, err
+		}
+		return filterTargetsByCompatibility(items, version), nil
 	}
 
 	isInteractiveInput := a.isInteractiveInput
@@ -100,6 +112,7 @@ func (a app) selectInstallTargets(
 	if err != nil {
 		return nil, err
 	}
+	items = filterTargetsByCompatibility(items, version)
 	if len(items) == 0 {
 		return nil, nil
 	}
@@ -209,4 +222,26 @@ func promptInstallTargets(stdin io.Reader, stdout io.Writer, items []targets.Tar
 	}
 
 	return selected, nil
+}
+
+func filterTargetsByCompatibility(items []targets.Target, version registry.Version) []targets.Target {
+	if len(version.Compatibility.Targets) == 0 {
+		return items
+	}
+
+	supported := make(map[string]struct{}, len(version.Compatibility.Targets))
+	for _, item := range version.Compatibility.Targets {
+		if item.BuiltFor || item.Tested || item.AdapterAvailable {
+			supported[item.TargetID] = struct{}{}
+		}
+	}
+
+	filtered := make([]targets.Target, 0, len(items))
+	for _, item := range items {
+		if _, ok := supported[item.ID]; ok {
+			filtered = append(filtered, item)
+		}
+	}
+
+	return filtered
 }

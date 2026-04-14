@@ -17,14 +17,26 @@ type Client struct {
 }
 
 type Version struct {
-	Namespace    string
-	Name         string
-	Version      string
-	Title        string
-	Description  string
-	License      string
-	ManifestJSON string
-	PublishedAt  string
+	Namespace     string
+	Name          string
+	Version       string
+	Title         string
+	Description   string
+	License       string
+	ManifestJSON  string
+	PublishedAt   string
+	Compatibility Compatibility
+}
+
+type Compatibility struct {
+	Targets []TargetCompatibility `json:"targets"`
+}
+
+type TargetCompatibility struct {
+	TargetID         string `json:"targetId"`
+	BuiltFor         bool   `json:"builtFor"`
+	Tested           bool   `json:"tested"`
+	AdapterAvailable bool   `json:"adapterAvailable"`
 }
 
 type AgentSummary struct {

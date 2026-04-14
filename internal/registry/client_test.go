@@ -20,7 +20,7 @@ func TestClientFetchesVersionAndArtifacts(t *testing.T) {
 		Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
 			switch request.URL.Path {
 			case "/api/v1/agents/raul/code-reviewer/versions/0.4.0":
-				return jsonResponse(`{"version":{"namespace":"raul","name":"code-reviewer","version":"0.4.0","title":"Code Reviewer","description":"Reviews code changes.","license":"MIT","manifestJson":"{}","publishedAt":"2026-03-23T00:00:00Z"}}`), nil
+				return jsonResponse(`{"version":{"namespace":"raul","name":"code-reviewer","version":"0.4.0","title":"Code Reviewer","description":"Reviews code changes.","license":"MIT","manifestJson":"{}","publishedAt":"2026-03-23T00:00:00Z","compatibility":{"targets":[{"targetId":"codex","builtFor":true,"tested":true,"adapterAvailable":true},{"targetId":"claude-code","builtFor":false,"tested":false,"adapterAvailable":true}]}}}`), nil
 			case "/api/v1/agents/raul/code-reviewer/versions/0.4.0/artifacts":
 				return jsonResponse(`{"items":[{"path":"agent.yaml","mediaType":"application/yaml","sizeBytes":12},{"path":"README.md","mediaType":"text/markdown","sizeBytes":24}]}`), nil
 			default:
@@ -41,6 +41,12 @@ func TestClientFetchesVersionAndArtifacts(t *testing.T) {
 	}
 	if version.Title != "Code Reviewer" {
 		t.Fatalf("Title = %q, want %q", version.Title, "Code Reviewer")
+	}
+	if len(version.Compatibility.Targets) != 2 {
+		t.Fatalf("len(version.Compatibility.Targets) = %d, want 2", len(version.Compatibility.Targets))
+	}
+	if version.Compatibility.Targets[0].TargetID != "codex" || !version.Compatibility.Targets[0].BuiltFor {
+		t.Fatalf("compatibility target = %+v", version.Compatibility.Targets[0])
 	}
 
 	artifacts, err := client.FetchArtifacts(t.Context(), ref)
