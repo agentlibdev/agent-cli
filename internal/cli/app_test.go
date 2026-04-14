@@ -83,6 +83,87 @@ func TestRunRemoveDeletesInstalledVersion(t *testing.T) {
 	}
 }
 
+func TestRunStatusPrintsInstallAndActivationState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ref := "raul/code-reviewer@0.4.0"
+	storePath := filepath.Join(home, ".agentlib", "agents", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(storePath, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	targetPath := filepath.Join(home, ".agents", "skills", "raul", "code-reviewer", "0.4.0")
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".agentlib", "config.json"), []byte("{\"version\":1,\"activations\":[{\"targetId\":\"codex\",\"ref\":\"raul/code-reviewer@0.4.0\",\"path\":\""+targetPath+"\",\"activatedAt\":\"2026-04-14T10:00:00Z\"}]}\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := (app{}).Run(context.Background(), []string{"status", ref}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "installed: yes") {
+		t.Fatalf("stdout = %q, want installed yes", output)
+	}
+	if !strings.Contains(output, "store: "+storePath) {
+		t.Fatalf("stdout = %q, want store path", output)
+	}
+	if !strings.Contains(output, "active targets: 1") || !strings.Contains(output, "codex") {
+		t.Fatalf("stdout = %q, want activation summary", output)
+	}
+}
+
+func TestRunStatusPrintsMissingWhenPackageIsNotInstalled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := (app{}).Run(context.Background(), []string{"status", "raul/code-reviewer@0.4.0"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "installed: no") {
+		t.Fatalf("stdout = %q, want installed no", output)
+	}
+	if !strings.Contains(output, "active targets: 0") {
+		t.Fatalf("stdout = %q, want zero activations", output)
+	}
+}
+
+func TestRunActivationsListPrintsPersistedRows(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if err := os.MkdirAll(filepath.Join(home, ".agentlib"), 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	configBody := `{"version":1,"activations":[{"targetId":"codex","ref":"raul/code-reviewer@0.4.0","path":"/tmp/codex","activatedAt":"2026-04-14T10:00:00Z"},{"targetId":"claude-code","ref":"raul/code-reviewer@0.4.0","path":"/tmp/claude","activatedAt":"2026-04-14T10:05:00Z"}]}`
+	if err := os.WriteFile(filepath.Join(home, ".agentlib", "config.json"), []byte(configBody+"\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	exitCode := (app{}).Run(context.Background(), []string{"activations", "list"}, &stdout, &stderr)
+	if exitCode != 0 {
+		t.Fatalf("Run exitCode = %d, stderr = %q", exitCode, stderr.String())
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "codex\traul/code-reviewer@0.4.0\t/tmp/codex") {
+		t.Fatalf("stdout = %q, want codex row", output)
+	}
+	if !strings.Contains(output, "claude-code\traul/code-reviewer@0.4.0\t/tmp/claude") {
+		t.Fatalf("stdout = %q, want claude row", output)
+	}
+}
+
 func TestRunInstallDefaultsToGlobalTarget(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

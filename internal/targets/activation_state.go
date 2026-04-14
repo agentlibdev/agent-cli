@@ -96,6 +96,22 @@ func RemoveActivation(storeRoot string, targetID string, ref agentref.Ref) error
 	return writeConfig(storeRoot, config)
 }
 
+func ActivationsForRef(storeRoot string, ref agentref.Ref) ([]Activation, error) {
+	config, err := LoadConfig(storeRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]Activation, 0, len(config.Activations))
+	for _, item := range config.Activations {
+		if item.Ref == ref.String() {
+			filtered = append(filtered, item)
+		}
+	}
+
+	return filtered, nil
+}
+
 func writeConfig(storeRoot string, config Config) error {
 	config.Version = activationConfigVersion
 	if config.Activations == nil {

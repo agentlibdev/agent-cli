@@ -16,6 +16,8 @@ Current commands:
 - `agentlib validate ./agent.yaml`
 - `agentlib search reviewer`
 - `agentlib show raul/code-reviewer@0.4.0`
+- `agentlib status raul/code-reviewer@0.4.0`
+- `agentlib activations list`
 - `agentlib install raul/code-reviewer@0.4.0`
 - `agentlib deactivate --target codex raul/code-reviewer@0.4.0`
 - `agentlib remove raul/code-reviewer@0.4.0`
@@ -113,6 +115,18 @@ Activation state is persisted in the selected AgentLib store root:
 - local: `<project>/.agentlib/config.json`
 
 Each activation record tracks the runtime target id, the package ref, the materialized path, and activation time.
+
+Inspect one package with:
+
+```bash
+agentlib status raul/code-reviewer@0.4.0
+```
+
+List all persisted activations with:
+
+```bash
+agentlib activations list
+```
 
 ## Target adapters
 

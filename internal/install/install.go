@@ -20,6 +20,11 @@ type Result struct {
 	Root string
 }
 
+type Status struct {
+	Installed bool
+	Path      string
+}
+
 type Lockfile struct {
 	Version int `json:"version"`
 	Agent   struct {
@@ -106,4 +111,16 @@ func Remove(root string, ref agentref.Ref) error {
 	}
 
 	return nil
+}
+
+func StatusFor(root string, ref agentref.Ref) (Status, error) {
+	installRoot := filepath.Join(root, "agents", ref.Namespace, ref.Name, ref.Version)
+	if _, err := os.Stat(installRoot); err != nil {
+		if os.IsNotExist(err) {
+			return Status{Installed: false, Path: installRoot}, nil
+		}
+		return Status{}, err
+	}
+
+	return Status{Installed: true, Path: installRoot}, nil
 }

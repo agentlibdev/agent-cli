@@ -72,6 +72,10 @@ func (a app) Run(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return a.runSearch(ctx, args[1:], stdout, stderr)
 	case "show":
 		return a.runShow(ctx, args[1:], stdout, stderr)
+	case "status":
+		return a.runStatus(args[1:], stdout, stderr)
+	case "activations":
+		return a.runActivations(args[1:], stdout, stderr)
 	case "install":
 		return a.runInstall(ctx, args[1:], stdout, stderr)
 	case "remove":
@@ -253,6 +257,102 @@ func (a app) runInstall(ctx context.Context, args []string, stdout, stderr io.Wr
 	fmt.Fprintf(stdout, "installed: %s/%s@%s\n", ref.Namespace, ref.Name, ref.Version)
 	fmt.Fprintf(stdout, "root: %s\n", result.Root)
 	fmt.Fprintf(stdout, "lockfile: %s\n", resolvedTarget.LockfilePath)
+	return 0
+}
+
+func (a app) runStatus(args []string, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	local := flags.Bool("local", false, "")
+	global := flags.Bool("global", false, "")
+	flags.BoolVar(global, "g", false, "")
+	installDir := flags.String("install-dir", "", "")
+	if err := flags.Parse(args); err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib status [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		return 1
+	}
+	if flags.NArg() != 1 {
+		fmt.Fprintln(stderr, "usage: agentlib status [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
+		return 1
+	}
+
+	resolvedTarget, err := resolveInstallTarget(*local, *global, *installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	ref, err := agentref.Parse(flags.Arg(0))
+	if err != nil {
+		fmt.Fprintf(stderr, "parse ref: %v\n", err)
+		return 1
+	}
+
+	status, err := install.StatusFor(resolvedTarget.Root, ref)
+	if err != nil {
+		fmt.Fprintf(stderr, "read install status: %v\n", err)
+		return 1
+	}
+
+	activations, err := targets.ActivationsForRef(resolvedTarget.Root, ref)
+	if err != nil {
+		fmt.Fprintf(stderr, "read activations: %v\n", err)
+		return 1
+	}
+
+	installedState := "no"
+	if status.Installed {
+		installedState = "yes"
+	}
+
+	fmt.Fprintf(stdout, "%s\n", ref.String())
+	fmt.Fprintf(stdout, "installed: %s\n", installedState)
+	fmt.Fprintf(stdout, "store: %s\n", status.Path)
+	fmt.Fprintf(stdout, "active targets: %d\n", len(activations))
+	for _, activation := range activations {
+		fmt.Fprintf(stdout, "- %s\t%s\n", activation.TargetID, activation.Path)
+	}
+
+	return 0
+}
+
+func (a app) runActivations(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 0 || args[0] != "list" {
+		fmt.Fprintln(stderr, "usage: agentlib activations list [--local|--global|-g] [--install-dir <dir>]")
+		return 1
+	}
+
+	flags := flag.NewFlagSet("activations list", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	local := flags.Bool("local", false, "")
+	global := flags.Bool("global", false, "")
+	flags.BoolVar(global, "g", false, "")
+	installDir := flags.String("install-dir", "", "")
+	if err := flags.Parse(args[1:]); err != nil {
+		fmt.Fprintln(stderr, "usage: agentlib activations list [--local|--global|-g] [--install-dir <dir>]")
+		return 1
+	}
+	if flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "usage: agentlib activations list [--local|--global|-g] [--install-dir <dir>]")
+		return 1
+	}
+
+	resolvedTarget, err := resolveInstallTarget(*local, *global, *installDir)
+	if err != nil {
+		fmt.Fprintf(stderr, "resolve install target: %v\n", err)
+		return 1
+	}
+
+	config, err := targets.LoadConfig(resolvedTarget.Root)
+	if err != nil {
+		fmt.Fprintf(stderr, "read activations: %v\n", err)
+		return 1
+	}
+
+	for _, activation := range config.Activations {
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\n", activation.TargetID, activation.Ref, activation.Path, activation.ActivatedAt)
+	}
+
 	return 0
 }
 
@@ -519,8 +619,10 @@ func printUsage(writer io.Writer) {
 	fmt.Fprintln(writer, "  init")
 	fmt.Fprintln(writer, "  search <query>")
 	fmt.Fprintln(writer, "  show <namespace/name@version>")
+	fmt.Fprintln(writer, "  status [--local|--global|-g] [--install-dir <dir>] <namespace/name@version>")
 	fmt.Fprintln(writer, "  targets list")
 	fmt.Fprintln(writer, "  targets detect")
+	fmt.Fprintln(writer, "  activations list [--local|--global|-g] [--install-dir <dir>]")
 	fmt.Fprintln(writer, "  activate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  enable [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
 	fmt.Fprintln(writer, "  deactivate [--local|--global|-g] [--install-dir <dir>] --target <id> <namespace/name@version>")
