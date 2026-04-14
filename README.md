@@ -134,6 +134,28 @@ List all persisted activations with:
 agentlib activations list
 ```
 
+## Local smoke flow
+
+When the local API is running and the registry has been populated with a real package, use the smoke script to exercise the full lifecycle in one shot:
+
+```bash
+AGENTLIB_BASE_URL=http://127.0.0.1:8787 ./scripts/smoke-local.sh
+```
+
+The script runs in a temporary `HOME`, then checks:
+
+- registry search
+- install with explicit runtime activation
+- activation state visibility via `status` and `activations list`
+- `deactivate`
+- `remove`
+
+You can point it at another real package with:
+
+```bash
+AGENTLIB_SMOKE_REF=namespace/name@version AGENTLIB_SMOKE_QUERY=name ./scripts/smoke-local.sh
+```
+
 ## Target adapters
 
 The CLI has built-in target definitions for:
