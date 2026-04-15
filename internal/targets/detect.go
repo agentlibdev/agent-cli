@@ -116,6 +116,8 @@ func builtInCommands(id string) []string {
 		return []string{"gemini", "gemini-cli"}
 	case "github-copilot":
 		return []string{"github-copilot", "copilot"}
+	case "kiro":
+		return []string{"kiro"}
 	case "opencode":
 		return []string{"opencode"}
 	case "windsurf":

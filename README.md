@@ -167,6 +167,7 @@ The CLI has built-in target definitions for:
 - `codex`
 - `gemini-cli`
 - `github-copilot`
+- `kiro`
 - `langchain`
 - `openclaw`
 - `opencode`
@@ -198,6 +199,7 @@ Built-in targets resolve their default skill directory from `HOME`. For example:
 - `cursor` -> `~/.cursor/skills`
 - `gemini-cli` -> `~/.gemini/skills`
 - `antigravity` -> `~/.gemini/antigravity/skills`
+- `kiro` -> `~/.kiro/skills`
 - `crewai` -> `~/.crewai/agents`
 - `langchain` -> `~/.langchain/agents`
 - `openclaw` -> `~/.openclaw/agents`

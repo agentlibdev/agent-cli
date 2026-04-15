@@ -142,6 +142,16 @@ func builtIns(home string) []Target {
 			Enabled:      true,
 		},
 		{
+			ID:           "kiro",
+			Name:         "Kiro",
+			Type:         TypeBuiltIn,
+			Format:       "kiro",
+			RelativePath: ".kiro/skills",
+			InstallRoot:  filepath.Join(home, ".kiro", "skills"),
+			Mode:         "symlink",
+			Enabled:      true,
+		},
+		{
 			ID:           "langchain",
 			Name:         "LangChain",
 			Type:         TypeBuiltIn,
